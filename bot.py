@@ -9,7 +9,8 @@ from telegram.error import TelegramError
 
 # --- CONFIGURATION ---
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-GROUP_CHAT_ID = os.getenv('GROUP_CHAT_ID')
+# Use comma-separated list of chat IDs
+GROUP_CHAT_IDS = os.getenv('GROUP_CHAT_IDS', '').split(',')
 REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://1wytkd.com/v3/lucky-jet-updated?p=qye5')
 TIMEZONE = os.getenv('TIMEZONE', 'Asia/Kolkata')
 CURRENCY_SYMBOL = os.getenv('CURRENCY_SYMBOL', '₹')
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 bot = Bot(token=BOT_TOKEN)
 
-# Enhanced message templates
+# Enhanced message templates (same as before)
 SIGNAL_TEMPLATES = [
     """🚀 *LUCKYJET SIGNAL ALERT* 🚀
 
@@ -118,55 +119,71 @@ def get_bet_time():
     bet_time = now + timedelta(minutes=random.randint(3, 8))
     return bet_time.strftime("%I:%M %p")
 
+async def send_to_all_channels(message_func):
+    """Helper function to send messages to all channels"""
+    for chat_id in GROUP_CHAT_IDS:
+        if not chat_id.strip():
+            continue
+            
+        try:
+            await message_func(chat_id.strip())
+            # Add a small delay between messages to avoid rate limiting
+            await asyncio.sleep(1)
+        except Exception as e:
+            logger.error(f"Error sending to {chat_id}: {e}")
+
+async def send_signal_to_chat(chat_id):
+    """Send signal to a specific chat"""
+    bet_time = get_bet_time()
+    multiplier = random_multiplier()
+    message = random.choice(SIGNAL_TEMPLATES).format(
+        bet_time=bet_time,
+        multiplier=multiplier,
+        currency_symbol=CURRENCY_SYMBOL,
+        register_link=REGISTER_LINK,
+        reactions=random_reactions()
+    )
+    
+    await bot.send_message(
+        chat_id=chat_id,
+        text=message,
+        parse_mode='Markdown',
+        disable_web_page_preview=True
+    )
+    logger.info(f"Signal sent to {chat_id} for Bet Time {bet_time}")
+
+async def send_register_to_chat(chat_id):
+    """Send register message to a specific chat"""
+    message = random.choice(REGISTER_TEMPLATES).format(
+        currency_symbol=CURRENCY_SYMBOL,
+        register_link=REGISTER_LINK,
+        reactions=random_reactions()
+    )
+    
+    await bot.send_message(
+        chat_id=chat_id,
+        text=message,
+        parse_mode='Markdown',
+        disable_web_page_preview=True
+    )
+    logger.info(f"Register message sent to {chat_id}")
+
 async def send_signal():
-    try:
-        bet_time = get_bet_time()
-        multiplier = random_multiplier()
-        message = random.choice(SIGNAL_TEMPLATES).format(
-            bet_time=bet_time,
-            multiplier=multiplier,
-            currency_symbol=CURRENCY_SYMBOL,
-            register_link=REGISTER_LINK,
-            reactions=random_reactions()
-        )
-        
-        await bot.send_message(
-            chat_id=GROUP_CHAT_ID,
-            text=message,
-            parse_mode='Markdown',
-            disable_web_page_preview=True
-        )
-        logger.info(f"Signal sent for Bet Time {bet_time}")
-        
-    except TelegramError as e:
-        logger.error(f"Error sending signal: {e}")
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
+    """Send signal to all channels"""
+    await send_to_all_channels(send_signal_to_chat)
 
 async def send_register():
-    try:
-        message = random.choice(REGISTER_TEMPLATES).format(
-            currency_symbol=CURRENCY_SYMBOL,
-            register_link=REGISTER_LINK,
-            reactions=random_reactions()
-        )
-        
-        await bot.send_message(
-            chat_id=GROUP_CHAT_ID,
-            text=message,
-            parse_mode='Markdown',
-            disable_web_page_preview=True
-        )
-        logger.info("Register message sent.")
-        
-    except TelegramError as e:
-        logger.error(f"Error sending register message: {e}")
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
+    """Send register message to all channels"""
+    await send_to_all_channels(send_register_to_chat)
 
 async def main():
     logger.info("Bot started successfully...")
     print("Bot is running. Press Ctrl+C to stop.")
+    
+    # Validate we have at least one chat ID
+    if not GROUP_CHAT_IDS or not any(GROUP_CHAT_IDS):
+        logger.error("No GROUP_CHAT_IDS configured!")
+        return
     
     while True:
         try:
