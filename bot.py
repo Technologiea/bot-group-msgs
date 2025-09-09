@@ -6,10 +6,13 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from telegram import Bot
 from telegram.error import TelegramError
+from flask import Flask, jsonify
+
+# Initialize Flask app
+app = Flask(__name__)
 
 # --- CONFIGURATION ---
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-# Use comma-separated list of chat IDs
 GROUP_CHAT_IDS = os.getenv('GROUP_CHAT_IDS', '').split(',')
 REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://1wytkd.com/v3/lucky-jet-updated?p=qye5')
 TIMEZONE = os.getenv('TIMEZONE', 'Asia/Kolkata')
@@ -25,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 bot = Bot(token=BOT_TOKEN)
 
-# Enhanced message templates (same as before)
+# Enhanced message templates
 SIGNAL_TEMPLATES = [
     """🚀 *LUCKYJET SIGNAL ALERT* 🚀
 
@@ -197,10 +200,38 @@ async def main():
             logger.error(f"Error in main loop: {e}")
             await asyncio.sleep(60)  # Wait before retrying
 
-if __name__ == "__main__":
+# Flask Routes
+@app.route('/')
+def health_check():
+    return jsonify({"status": "ok", "message": "Telegram bot is running"})
+
+@app.route('/send-signal')
+async def send_signal_endpoint():
     try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
+        await send_signal()
+        return jsonify({"status": "success", "message": "Signal sent to all channels"})
     except Exception as e:
-        logger.error(f"Fatal error: {e}")
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/send-register')
+async def send_register_endpoint():
+    try:
+        await send_register()
+        return jsonify({"status": "success", "message": "Register message sent to all channels"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+def run_bot():
+    """Function to run the bot in a separate thread"""
+    asyncio.run(main())
+
+if __name__ == "__main__":
+    # Start the bot in a separate thread
+    import threading
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
+    
+    # Start the Flask app
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
