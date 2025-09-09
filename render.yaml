@@ -5,14 +5,3 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python bot.py
     plan: free
-    envVars:
-      - key: BOT_TOKEN
-        sync: false
-      - key: GROUP_CHAT_ID
-        sync: false
-      - key: REGISTER_LINK
-        value: https://1wytkd.com/v3/lucky-jet-updated?p=qye5
-      - key: TIMEZONE
-        value: Asia/Kolkata
-      - key: CURRENCY_SYMBOL
-        value: ₹
