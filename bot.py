@@ -14,7 +14,7 @@ app = Flask(__name__)
 # --- CONFIGURATION ---
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 GROUP_CHAT_IDS = os.getenv('GROUP_CHAT_IDS', '').split(',')
-REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://1wytkd.com/v3/lucky-jet-updated?p=qye5')
+REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://lkpq.cc/eec3')
 TIMEZONE = os.getenv('TIMEZONE', 'Asia/Kolkata')
 CURRENCY_SYMBOL = os.getenv('CURRENCY_SYMBOL', '₹')
 # --- CONFIGURATION ---
