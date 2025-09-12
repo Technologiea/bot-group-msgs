@@ -151,7 +151,7 @@ def random_reactions():
     for emoji, weight in REACTION_WEIGHTS.items():
         weighted_emojis.extend([emoji] * weight)
     
-    # Select 5 random emojis from the weighted list
+    # Select 5 unique random emojis from the weighted list
     selected_emojis = random.sample(weighted_emojis, 5)
     return " ".join(selected_emojis)
 
@@ -165,12 +165,8 @@ def is_signal_time():
     now = datetime.now(ZoneInfo(TIMEZONE))
     current_time = now.time()
     
-    # Check if it's between 8 PM and midnight
-    if time(20, 0) <= current_time <= time(23, 59):
-        return True
-    
-    # Check if it's between midnight and 12:35 AM
-    if time(0, 0) <= current_time <= time(0, 35):
+    # Check if it's between 8 PM and 12:35 AM
+    if time(20, 0) <= current_time or current_time <= time(0, 35):
         return True
     
     return False
@@ -182,13 +178,20 @@ def is_last_signal_time():
     return time(0, 30) <= current_time <= time(0, 35)
 
 def is_registration_reminder_time():
-    """Check if current time is 10 AM, 1 PM, or 4 PM"""
+    """Check if current time is 10 AM, 1 PM, or 4 PM (within a 5-minute window)"""
     now = datetime.now(ZoneInfo(TIMEZONE))
     current_time = now.time()
+    current_minute = now.minute
     
-    return (current_time.hour == 10 and current_time.minute == 0) or \
-           (current_time.hour == 13 and current_time.minute == 0) or \
-           (current_time.hour == 16 and current_time.minute == 0)
+    # Check if it's within 5 minutes of the target times
+    target_times = [time(10, 0), time(13, 0), time(16, 0)]
+    for target in target_times:
+        if (current_time.hour == target.hour and 
+            current_time.minute >= target.minute and 
+            current_time.minute <= target.minute + 5):
+            return True
+    
+    return False
 
 async def send_to_all_channels(message_func):
     """Helper function to send messages to all channels"""
@@ -233,13 +236,27 @@ async def send_signal_to_chat(chat_id):
     )
     logger.info(f"Signal sent to {chat_id} for Bet Time {bet_time}")
 
-async def send_register_to_chat(chat_id):
+async def send_register_to_chat(chat_id, is_daytime=True):
     """Send register message to a specific chat"""
-    message = random.choice(DAYTIME_REGISTER_TEMPLATES).format(
-        currency_symbol=CURRENCY_SYMBOL,
-        register_link=REGISTER_LINK,
-        reactions=random_reactions()
-    )
+    if is_daytime:
+        message = random.choice(DAYTIME_REGISTER_TEMPLATES).format(
+            currency_symbol=CURRENCY_SYMBOL,
+            register_link=REGISTER_LINK,
+            reactions=random_reactions()
+        )
+    else:
+        # Use a simpler registration message during signal hours
+        message = f"""🔥 *QUICK REMINDER* 🔥
+
+Don't miss out on our signals! Register and deposit now to get started.
+
+💰 *500% BONUS* on your first deposit!
+
+🔗 [REGISTER NOW]({REGISTER_LINK}) 
+👉 [DEPOSIT NOW]({REGISTER_LINK})
+
+⚡ Start winning with us today!
+{random_reactions()}"""
     
     await bot.send_message(
         chat_id=chat_id,
@@ -253,9 +270,9 @@ async def send_signal():
     """Send signal to all channels"""
     await send_to_all_channels(send_signal_to_chat)
 
-async def send_register():
+async def send_register(is_daytime=True):
     """Send register message to all channels"""
-    await send_to_all_channels(send_register_to_chat)
+    await send_to_all_channels(lambda chat_id: send_register_to_chat(chat_id, is_daytime))
 
 async def main():
     logger.info("Bot started successfully...")
@@ -266,8 +283,9 @@ async def main():
         logger.error("No GROUP_CHAT_IDS configured!")
         return
     
-    # Track last registration reminder to avoid duplicates
-    last_registration_reminder = None
+    # Track last actions to prevent duplicates
+    last_signal_time = None
+    last_registration_time = None
     
     while True:
         try:
@@ -276,26 +294,26 @@ async def main():
             
             # Check if it's signal time (8 PM to 12:35 AM)
             if is_signal_time():
-                await send_signal()
-                
-                # If it's the last signal time, wait longer before next check
-                if is_last_signal_time():
-                    await asyncio.sleep(300)  # Wait 5 minutes
-                else:
-                    await asyncio.sleep(random.randint(880, 920))  # Wait 15 minutes
+                # Send signal every 15 minutes
+                if last_signal_time is None or (now - last_signal_time).total_seconds() >= 900:
+                    await send_signal()
+                    last_signal_time = now
                     
-                # Send registration message after signal
-                if is_signal_time():  # Check again in case we crossed the time boundary
-                    await send_register()
-                    await asyncio.sleep(random.randint(880, 920))  # Wait 15 minutes
+                    # If it's the last signal time, wait longer
+                    if is_last_signal_time():
+                        await asyncio.sleep(300)  # Wait 5 minutes
+                    else:
+                        await asyncio.sleep(60)  # Wait 1 minute before next check
+                else:
+                    await asyncio.sleep(60)  # Wait 1 minute and check again
             
             # Check if it's registration reminder time (10 AM, 1 PM, or 4 PM)
             elif is_registration_reminder_time():
-                # Only send once per hour
-                if last_registration_reminder != current_time.hour:
-                    await send_register()
-                    last_registration_reminder = current_time.hour
-                    await asyncio.sleep(60)  # Wait 1 minute to avoid duplicate sends
+                # Send registration reminder once per time slot
+                if last_registration_time is None or (now - last_registration_time).total_seconds() >= 3600:
+                    await send_register(is_daytime=True)
+                    last_registration_time = now
+                    await asyncio.sleep(300)  # Wait 5 minutes to avoid duplicates
                 else:
                     await asyncio.sleep(60)  # Wait 1 minute and check again
             
