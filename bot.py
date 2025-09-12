@@ -2,7 +2,7 @@ import asyncio
 import random
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from telegram import Bot
 from telegram.error import TelegramError
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 bot = Bot(token=BOT_TOKEN)
 
-# Enhanced message templates
+# Signal message templates for 8 PM to 12:35 AM
 SIGNAL_TEMPLATES = [
     """🚀 *LUCKYJET SIGNAL ALERT* 🚀
 
@@ -61,35 +61,73 @@ SIGNAL_TEMPLATES = [
 {reactions}"""
 ]
 
-REGISTER_TEMPLATES = [
-    """💎 *READY TO WIN BIG?* 💎
+# Last signal of the day template
+LAST_SIGNAL_TEMPLATE = """⚠️ *LAST SIGNAL OF THE DAY* ⚠️
+🚀 *FINAL OPPORTUNITY TO WIN TODAY* 🚀
 
-Create your account now and claim your 500% welcome bonus!
+🔥 *Don't miss out!* Get 500% BONUS on your first deposit!
 
-✨ *Why choose us?*
-✅ Highest success rate signals
-✅ Instant withdrawals
-✅ 24/7 professional support
+⏰ Bet Time: {bet_time}
+🎯 Cash Out Target: {multiplier}x
+
+✨ *This is your final chance to win today!*
 
 🔗 [REGISTER NOW]({register_link}) 
 👉 [DEPOSIT NOW]({register_link})
 
-⚡ Your first big win is just minutes away!
+⚡ Start with just {currency_symbol}10 and multiply your money!
+{reactions}"""
+
+# Registration message templates for 10 AM, 1 PM, and 4 PM
+DAYTIME_REGISTER_TEMPLATES = [
+    """🌅 *MORNING OPPORTUNITY* 🌅
+
+Start your day with a winning strategy! Register now and get ready for our evening signals.
+
+🔥 *500% WELCOME BONUS* waiting for you!
+
+✨ *Why join us?*
+✅ Professional signal team
+✅ High success rate
+✅ Instant withdrawals
+✅ 24/7 support
+
+🔗 [REGISTER NOW]({register_link}) 
+👉 [DEPOSIT NOW]({register_link})
+
+⚡ Get ready for our daily free signals starting at 8 PM!
 {reactions}""",
 
-    """🎯 *DON'T MISS YOUR OPPORTUNITY!* 🎯
+    """☀️ *AFTERNOON REMINDER* ☀️
 
-Join thousands of winners who started with our 500% bonus!
+Don't forget to register and deposit for tonight's winning signals!
 
-🔥 *Limited time offer:*
-⭐ 500% welcome bonus
-⭐ Daily guaranteed signals
-⭐ Professional betting guidance
+💰 *500% BONUS* on your first deposit - Limited time offer!
+
+🎯 *Tonight's schedule:*
+⏰ 8:00 PM - 12:35 AM: Free signals every 15 minutes
 
 🔗 [REGISTER NOW]({register_link}) 
 👉 [DEPOSIT NOW]({register_link})
 
-✨ Your future self will thank you!
+⚡ Be prepared for our evening signals!
+{reactions}""",
+
+    """🌇 *EVENING APPROACHING* 🌇
+
+Last chance to register before our free signals start at 8 PM!
+
+🔥 *500% BONUS* - Don't miss this opportunity!
+
+✨ *Tonight's guaranteed signals include:*
+✅ High probability wins
+✅ Professional analysis
+✅ Real-time updates
+
+🔗 [REGISTER NOW]({register_link}) 
+👉 [DEPOSIT NOW]({register_link})
+
+⚡ Free signals start at 8 PM sharp!
 {reactions}"""
 ]
 
@@ -122,6 +160,36 @@ def get_bet_time():
     bet_time = now + timedelta(minutes=random.randint(3, 8))
     return bet_time.strftime("%I:%M %p")
 
+def is_signal_time():
+    """Check if current time is between 8 PM and 12:35 AM"""
+    now = datetime.now(ZoneInfo(TIMEZONE))
+    current_time = now.time()
+    
+    # Check if it's between 8 PM and midnight
+    if time(20, 0) <= current_time <= time(23, 59):
+        return True
+    
+    # Check if it's between midnight and 12:35 AM
+    if time(0, 0) <= current_time <= time(0, 35):
+        return True
+    
+    return False
+
+def is_last_signal_time():
+    """Check if current time is between 12:30 AM and 12:35 AM"""
+    now = datetime.now(ZoneInfo(TIMEZONE))
+    current_time = now.time()
+    return time(0, 30) <= current_time <= time(0, 35)
+
+def is_registration_reminder_time():
+    """Check if current time is 10 AM, 1 PM, or 4 PM"""
+    now = datetime.now(ZoneInfo(TIMEZONE))
+    current_time = now.time()
+    
+    return (current_time.hour == 10 and current_time.minute == 0) or \
+           (current_time.hour == 13 and current_time.minute == 0) or \
+           (current_time.hour == 16 and current_time.minute == 0)
+
 async def send_to_all_channels(message_func):
     """Helper function to send messages to all channels"""
     for chat_id in GROUP_CHAT_IDS:
@@ -139,13 +207,23 @@ async def send_signal_to_chat(chat_id):
     """Send signal to a specific chat"""
     bet_time = get_bet_time()
     multiplier = random_multiplier()
-    message = random.choice(SIGNAL_TEMPLATES).format(
-        bet_time=bet_time,
-        multiplier=multiplier,
-        currency_symbol=CURRENCY_SYMBOL,
-        register_link=REGISTER_LINK,
-        reactions=random_reactions()
-    )
+    
+    if is_last_signal_time():
+        message = LAST_SIGNAL_TEMPLATE.format(
+            bet_time=bet_time,
+            multiplier=multiplier,
+            currency_symbol=CURRENCY_SYMBOL,
+            register_link=REGISTER_LINK,
+            reactions=random_reactions()
+        )
+    else:
+        message = random.choice(SIGNAL_TEMPLATES).format(
+            bet_time=bet_time,
+            multiplier=multiplier,
+            currency_symbol=CURRENCY_SYMBOL,
+            register_link=REGISTER_LINK,
+            reactions=random_reactions()
+        )
     
     await bot.send_message(
         chat_id=chat_id,
@@ -157,7 +235,7 @@ async def send_signal_to_chat(chat_id):
 
 async def send_register_to_chat(chat_id):
     """Send register message to a specific chat"""
-    message = random.choice(REGISTER_TEMPLATES).format(
+    message = random.choice(DAYTIME_REGISTER_TEMPLATES).format(
         currency_symbol=CURRENCY_SYMBOL,
         register_link=REGISTER_LINK,
         reactions=random_reactions()
@@ -188,14 +266,43 @@ async def main():
         logger.error("No GROUP_CHAT_IDS configured!")
         return
     
+    # Track last registration reminder to avoid duplicates
+    last_registration_reminder = None
+    
     while True:
         try:
-            await send_signal()
-            await asyncio.sleep(random.randint(280, 320))  # 5 min ± variation
+            now = datetime.now(ZoneInfo(TIMEZONE))
+            current_time = now.time()
             
-            await send_register()
-            await asyncio.sleep(random.randint(880, 920))  # 15 min ± variation
+            # Check if it's signal time (8 PM to 12:35 AM)
+            if is_signal_time():
+                await send_signal()
+                
+                # If it's the last signal time, wait longer before next check
+                if is_last_signal_time():
+                    await asyncio.sleep(300)  # Wait 5 minutes
+                else:
+                    await asyncio.sleep(random.randint(880, 920))  # Wait 15 minutes
+                    
+                # Send registration message after signal
+                if is_signal_time():  # Check again in case we crossed the time boundary
+                    await send_register()
+                    await asyncio.sleep(random.randint(880, 920))  # Wait 15 minutes
             
+            # Check if it's registration reminder time (10 AM, 1 PM, or 4 PM)
+            elif is_registration_reminder_time():
+                # Only send once per hour
+                if last_registration_reminder != current_time.hour:
+                    await send_register()
+                    last_registration_reminder = current_time.hour
+                    await asyncio.sleep(60)  # Wait 1 minute to avoid duplicate sends
+                else:
+                    await asyncio.sleep(60)  # Wait 1 minute and check again
+            
+            else:
+                # Not in any special time, wait 1 minute and check again
+                await asyncio.sleep(60)
+                
         except Exception as e:
             logger.error(f"Error in main loop: {e}")
             await asyncio.sleep(60)  # Wait before retrying
