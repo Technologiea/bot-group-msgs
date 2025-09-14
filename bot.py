@@ -6,15 +6,11 @@ from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from telegram import Bot
 from telegram.error import TelegramError
-from flask import Flask, jsonify
-
-# Initialize Flask app
-app = Flask(__name__)
 
 # --- CONFIGURATION ---
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 GROUP_CHAT_IDS = os.getenv('GROUP_CHAT_IDS', '').split(',')
-REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://lkpq.cc/eec3')
+REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://lkpf.pro/98c42daa')
 TIMEZONE = os.getenv('TIMEZONE', 'Asia/Kolkata')
 CURRENCY_SYMBOL = os.getenv('CURRENCY_SYMBOL', '₹')
 # --- CONFIGURATION ---
@@ -25,6 +21,14 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+# Validate environment variables
+if not BOT_TOKEN:
+    logger.error("BOT_TOKEN is not set!")
+    exit(1)
+if not GROUP_CHAT_IDS or not any(GROUP_CHAT_IDS):
+    logger.error("No GROUP_CHAT_IDS configured!")
+    exit(1)
 
 bot = Bot(token=BOT_TOKEN)
 
@@ -146,14 +150,10 @@ def random_multiplier():
     return round(random.uniform(1.5, 12.5), 2)
 
 def random_reactions():
-    # Create a weighted list of emojis
     weighted_emojis = []
     for emoji, weight in REACTION_WEIGHTS.items():
         weighted_emojis.extend([emoji] * weight)
-    
-    # Select 5 unique random emojis from the weighted list
-    selected_emojis = random.sample(weighted_emojis, 5)
-    return " ".join(selected_emojis)
+    return " ".join(random.sample(weighted_emojis, 5))
 
 def get_bet_time():
     now = datetime.now(ZoneInfo(TIMEZONE))
@@ -164,12 +164,7 @@ def is_signal_time():
     """Check if current time is between 8 PM and 12:35 AM"""
     now = datetime.now(ZoneInfo(TIMEZONE))
     current_time = now.time()
-    
-    # Check if it's between 8 PM and 12:35 AM
-    if time(20, 0) <= current_time or current_time <= time(0, 35):
-        return True
-    
-    return False
+    return time(20, 0) <= current_time or current_time <= time(0, 35)
 
 def is_last_signal_time():
     """Check if current time is between 12:30 AM and 12:35 AM"""
@@ -178,19 +173,15 @@ def is_last_signal_time():
     return time(0, 30) <= current_time <= time(0, 35)
 
 def is_registration_reminder_time():
-    """Check if current time is 10 AM, 1 PM, or 4 PM (within a 5-minute window)"""
+    """Check if current time is within 5 minutes of 10 AM, 1 PM, or 4 PM"""
     now = datetime.now(ZoneInfo(TIMEZONE))
     current_time = now.time()
-    current_minute = now.minute
-    
-    # Check if it's within 5 minutes of the target times
     target_times = [time(10, 0), time(13, 0), time(16, 0)]
     for target in target_times:
         if (current_time.hour == target.hour and 
             current_time.minute >= target.minute and 
             current_time.minute <= target.minute + 5):
             return True
-    
     return False
 
 async def send_to_all_channels(message_func):
@@ -198,12 +189,10 @@ async def send_to_all_channels(message_func):
     for chat_id in GROUP_CHAT_IDS:
         if not chat_id.strip():
             continue
-            
         try:
             await message_func(chat_id.strip())
-            # Add a small delay between messages to avoid rate limiting
-            await asyncio.sleep(1)
-        except Exception as e:
+            await asyncio.sleep(1)  # Avoid rate limiting
+        except TelegramError as e:
             logger.error(f"Error sending to {chat_id}: {e}")
 
 async def send_signal_to_chat(chat_id):
@@ -236,27 +225,13 @@ async def send_signal_to_chat(chat_id):
     )
     logger.info(f"Signal sent to {chat_id} for Bet Time {bet_time}")
 
-async def send_register_to_chat(chat_id, is_daytime=True):
+async def send_register_to_chat(chat_id):
     """Send register message to a specific chat"""
-    if is_daytime:
-        message = random.choice(DAYTIME_REGISTER_TEMPLATES).format(
-            currency_symbol=CURRENCY_SYMBOL,
-            register_link=REGISTER_LINK,
-            reactions=random_reactions()
-        )
-    else:
-        # Use a simpler registration message during signal hours
-        message = f"""🔥 *QUICK REMINDER* 🔥
-
-Don't miss out on our signals! Register and deposit now to get started.
-
-💰 *500% BONUS* on your first deposit!
-
-🔗 [REGISTER NOW]({REGISTER_LINK}) 
-👉 [DEPOSIT NOW]({REGISTER_LINK})
-
-⚡ Start winning with us today!
-{random_reactions()}"""
+    message = random.choice(DAYTIME_REGISTER_TEMPLATES).format(
+        currency_symbol=CURRENCY_SYMBOL,
+        register_link=REGISTER_LINK,
+        reactions=random_reactions()
+    )
     
     await bot.send_message(
         chat_id=chat_id,
@@ -266,97 +241,67 @@ Don't miss out on our signals! Register and deposit now to get started.
     )
     logger.info(f"Register message sent to {chat_id}")
 
-async def send_signal():
-    """Send signal to all channels"""
-    await send_to_all_channels(send_signal_to_chat)
-
-async def send_register(is_daytime=True):
-    """Send register message to all channels"""
-    await send_to_all_channels(lambda chat_id: send_register_to_chat(chat_id, is_daytime))
-
 async def main():
     logger.info("Bot started successfully...")
     print("Bot is running. Press Ctrl+C to stop.")
     
-    # Validate we have at least one chat ID
-    if not GROUP_CHAT_IDS or not any(GROUP_CHAT_IDS):
-        logger.error("No GROUP_CHAT_IDS configured!")
-        return
-    
-    # Track last actions to prevent duplicates
     last_signal_time = None
     last_registration_time = None
     
     while True:
         try:
             now = datetime.now(ZoneInfo(TIMEZONE))
-            current_time = now.time()
             
-            # Check if it's signal time (8 PM to 12:35 AM)
+            # Signal time: 8 PM to 12:35 AM
             if is_signal_time():
                 # Send signal every 15 minutes
                 if last_signal_time is None or (now - last_signal_time).total_seconds() >= 900:
-                    await send_signal()
+                    await send_to_all_channels(send_signal_to_chat)
                     last_signal_time = now
-                    
-                    # If it's the last signal time, wait longer
+                    # If last signal, wait until after 12:35 AM
                     if is_last_signal_time():
                         await asyncio.sleep(300)  # Wait 5 minutes
                     else:
-                        await asyncio.sleep(60)  # Wait 1 minute before next check
+                        await asyncio.sleep(60)  # Check every minute
                 else:
-                    await asyncio.sleep(60)  # Wait 1 minute and check again
+                    await asyncio.sleep(60)  # Check every minute
             
-            # Check if it's registration reminder time (10 AM, 1 PM, or 4 PM)
+            # Registration reminder time: 10 AM, 1 PM, 4 PM
             elif is_registration_reminder_time():
-                # Send registration reminder once per time slot
+                # Send registration message once per time slot
                 if last_registration_time is None or (now - last_registration_time).total_seconds() >= 3600:
-                    await send_register(is_daytime=True)
+                    await send_to_all_channels(send_register_to_chat)
                     last_registration_time = now
                     await asyncio.sleep(300)  # Wait 5 minutes to avoid duplicates
                 else:
-                    await asyncio.sleep(60)  # Wait 1 minute and check again
+                    await asyncio.sleep(60)  # Check every minute
             
             else:
-                # Not in any special time, wait 1 minute and check again
-                await asyncio.sleep(60)
+                # Calculate sleep time until next active period
+                current_time = now.time()
+                next_time = None
+                if current_time < time(10, 0):
+                    next_time = datetime.combine(now.date(), time(10, 0), tzinfo=ZoneInfo(TIMEZONE))
+                elif current_time < time(13, 0):
+                    next_time = datetime.combine(now.date(), time(13, 0), tzinfo=ZoneInfo(TIMEZONE))
+                elif current_time < time(16, 0):
+                    next_time = datetime.combine(now.date(), time(16, 0), tzinfo=ZoneInfo(TIMEZONE))
+                elif current_time < time(20, 0):
+                    next_time = datetime.combine(now.date(), time(20, 0), tzinfo=ZoneInfo(TIMEZONE))
+                else:
+                    # After 12:35 AM, wait until 10 AM next day
+                    next_time = datetime.combine(now.date() + timedelta(days=1), time(10, 0), tzinfo=ZoneInfo(TIMEZONE))
                 
+                sleep_seconds = (next_time - now).total_seconds()
+                if sleep_seconds > 0:
+                    logger.info(f"Sleeping until {next_time.strftime('%I:%M %p')} ({sleep_seconds} seconds)")
+                    await asyncio.sleep(sleep_seconds)
+                else:
+                    await asyncio.sleep(60)  # Fallback
+            
         except Exception as e:
             logger.error(f"Error in main loop: {e}")
-            await asyncio.sleep(60)  # Wait before retrying
-
-# Flask Routes
-@app.route('/')
-def health_check():
-    return jsonify({"status": "ok", "message": "Telegram bot is running"})
-
-@app.route('/send-signal')
-async def send_signal_endpoint():
-    try:
-        await send_signal()
-        return jsonify({"status": "success", "message": "Signal sent to all channels"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
-
-@app.route('/send-register')
-async def send_register_endpoint():
-    try:
-        await send_register()
-        return jsonify({"status": "success", "message": "Register message sent to all channels"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
-
-def run_bot():
-    """Function to run the bot in a separate thread"""
-    asyncio.run(main())
+            await asyncio.sleep(60)  # Retry after 1 minute
 
 if __name__ == "__main__":
-    # Start the bot in a separate thread
-    import threading
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.daemon = True
-    bot_thread.start()
-    
-    # Start the Flask app
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    asyncio.run(main())
