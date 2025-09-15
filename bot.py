@@ -330,7 +330,6 @@ async def send_register_to_chat(chat_id):
             reactions=random_reactions()
         )
     
-    await bot_sleep = random.randint(600, 1200)  # 10-20 minutes
     await bot.send_message(
         chat_id=chat_id,
         text=message,
