@@ -6,6 +6,8 @@ from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from telegram import Bot
 from telegram.error import TelegramError
+from flask import Flask, jsonify
+import threading
 
 # --- CONFIGURATION ---
 BOT_TOKEN = os.getenv('BOT_TOKEN')
@@ -13,6 +15,7 @@ GROUP_CHAT_IDS = os.getenv('GROUP_CHAT_IDS', '').split(',')
 REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://lkpq.cc/eec3')
 TIMEZONE = os.getenv('TIMEZONE', 'Asia/Kolkata')
 CURRENCY_SYMBOL = os.getenv('CURRENCY_SYMBOL', '₹')
+PORT = int(os.getenv('PORT', 5000))
 # --- CONFIGURATION ---
 
 # Set up logging
@@ -31,6 +34,7 @@ if not GROUP_CHAT_IDS or not any(GROUP_CHAT_IDS):
     exit(1)
 
 bot = Bot(token=BOT_TOKEN)
+app = Flask(__name__)
 
 # Signal message templates for 8 PM to 12:35 AM
 SIGNAL_TEMPLATES = [
@@ -357,18 +361,21 @@ async def main():
             # Signal time: 8 PM to 12:35 AM
             if is_signal_time():
                 # Send signal every 10-20 minutes
-                if last_signal_time is None or (now - last_signal_time).total_seconds() >= random.randint(600, 1200):
+                signal_interval = random.randint(600, 1200)  # 10-20 minutes
+                if last_signal_time is None or (now - last_signal_time).total_seconds() >= signal_interval:
+                    logger.info(f"Sending signal with interval {signal_interval} seconds")
                     await send_to_all_channels(send_signal_to_chat)
                     last_signal_time = now
                     
                     # If last signal, send goodnight message and wait
                     if is_last_signal_time() and not goodnight_sent:
                         await asyncio.sleep(30)  # Short delay before goodnight
+                        logger.info("Sending goodnight message")
                         await send_to_all_channels(send_goodnight_to_chat)
                         goodnight_sent = True
                         await asyncio.sleep(300)  # Wait 5 minutes
                     else:
-                        await asyncio.sleep(60)  # Check every minute
+                        await asyncio.sleep(signal_interval)  # Wait for the chosen interval
                 else:
                     await asyncio.sleep(60)  # Check every minute
             
@@ -376,6 +383,7 @@ async def main():
             elif is_registration_reminder_time():
                 # Send registration message once per time slot
                 if last_registration_time is None or (now - last_registration_time).total_seconds() >= 3600:
+                    logger.info("Sending registration reminder")
                     await send_to_all_channels(send_register_to_chat)
                     last_registration_time = now
                     await asyncio.sleep(300)  # Wait 5 minutes to avoid duplicates
@@ -411,5 +419,20 @@ async def main():
             logger.error(f"Error in main loop: {e}")
             await asyncio.sleep(60)  # Retry after 1 minute
 
-if __name__ == "__main__":
+# Flask endpoint for Render health check
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "ok", "message": "Telegram bot is running"})
+
+def run_bot():
+    """Run the bot in a separate thread"""
     asyncio.run(main())
+
+if __name__ == "__main__":
+    # Start the bot in a separate thread
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
+    
+    # Start Flask app for Render port binding
+    app.run(host='0.0.0.0', port=PORT)
