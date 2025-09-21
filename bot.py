@@ -131,6 +131,17 @@ LAST_SIGNAL_TEMPLATE = """⚠️ *LAST SIGNAL OF THE DAY* ⚠️
 ⚡ **{currency_symbol}10** can multiply fast!
 {reactions}"""
 
+# Success message template after each signal
+SUCCESS_TEMPLATE = """🎉 *SIGNAL PASSED SUCCESSFULLY!* 🎉
+
+💰 *EARNED PROFIT: {currency_symbol}{profit:,}!*
+🔥 *IT'S YOUR TIME TO EARN NOW!*
+
+🔗 [REGISTER NOW]({register_link}) 
+👉 [DEPOSIT NOW]({register_link})
+
+{reactions}"""
+
 # Goodnight message template after last signal
 GOODNIGHT_TEMPLATE = """🌙 *GOODNIGHT, WINNERS!* 🌙
 
@@ -167,7 +178,7 @@ Kickstart your day with a **500% BONUS**! Thousands are winning with our signals
 Don’t miss tonight’s signals! **500% BONUS** on your first deposit!
 
 🎯 *Tonight’s Plan:*
-⏰ **8 PM - 12:35 AM**: Signals every 10-20 min
+⏰ **8 PM - 12:35 AM**: Signals every 20 min
 
 🔗 [REGISTER NOW]({register_link}) 
 👉 [DEPOSIT NOW]({register_link})
@@ -224,6 +235,9 @@ REACTION_WEIGHTS = {
 def random_multiplier():
     return round(random.uniform(1.5, 12.5), 2)
 
+def random_profit():
+    return random.randint(10000, 50000) // 1000 * 1000  # Profits in thousands (₹10,000-₹50,000)
+
 def random_reactions():
     weighted_emojis = []
     for emoji, weight in REACTION_WEIGHTS.items():
@@ -233,31 +247,7 @@ def random_reactions():
 def get_bet_time():
     now = datetime.now(ZoneInfo(TIMEZONE))
     bet_time = now + timedelta(minutes=random.randint(3, 8))
-    return bet_time.strftime("%I:%M %p")
-
-def is_signal_time():
-    """Check if current time is between 8 PM and 12:35 AM"""
-    now = datetime.now(ZoneInfo(TIMEZONE))
-    current_time = now.time()
-    return time(20, 0) <= current_time or current_time <= time(0, 35)
-
-def is_last_signal_time():
-    """Check if current time is between 12:30 AM and 12:35 AM"""
-    now = datetime.now(ZoneInfo(TIMEZONE))
-    current_time = now.time()
-    return time(0, 30) <= current_time <= time(0, 35)
-
-def is_registration_reminder_time():
-    """Check if current time is within 5 minutes of 9 AM, 1 PM, 4 PM, or 7 PM"""
-    now = datetime.now(ZoneInfo(TIMEZONE))
-    current_time = now.time()
-    target_times = [time(9, 0), time(13, 0), time(16, 0), time(19, 0)]
-    for target in target_times:
-        if (current_time.hour == target.hour and 
-            current_time.minute >= target.minute and 
-            current_time.minute <= target.minute + 5):
-            return True
-    return False
+    return bet_time
 
 async def send_to_all_channels(message_func):
     """Helper function to send messages to all channels"""
@@ -270,14 +260,11 @@ async def send_to_all_channels(message_func):
         except TelegramError as e:
             logger.error(f"Error sending to {chat_id}: {e}")
 
-async def send_signal_to_chat(chat_id):
+async def send_signal_to_chat(chat_id, bet_time, multiplier):
     """Send signal to a specific chat"""
-    bet_time = get_bet_time()
-    multiplier = random_multiplier()
-    
     if is_last_signal_time():
         message = LAST_SIGNAL_TEMPLATE.format(
-            bet_time=bet_time,
+            bet_time=bet_time.strftime("%I:%M %p"),
             multiplier=multiplier,
             currency_symbol=CURRENCY_SYMBOL,
             register_link=REGISTER_LINK,
@@ -285,7 +272,7 @@ async def send_signal_to_chat(chat_id):
         )
     else:
         message = random.choice(SIGNAL_TEMPLATES).format(
-            bet_time=bet_time,
+            bet_time=bet_time.strftime("%I:%M %p"),
             multiplier=multiplier,
             currency_symbol=CURRENCY_SYMBOL,
             register_link=REGISTER_LINK,
@@ -298,7 +285,24 @@ async def send_signal_to_chat(chat_id):
         parse_mode='Markdown',
         disable_web_page_preview=True
     )
-    logger.info(f"Signal sent to {chat_id} for Bet Time {bet_time}")
+    logger.info(f"Signal sent to {chat_id} for Bet Time {bet_time.strftime('%I:%M %p')}")
+
+async def send_success_to_chat(chat_id):
+    """Send success message to a specific chat"""
+    message = SUCCESS_TEMPLATE.format(
+        currency_symbol=CURRENCY_SYMBOL,
+        profit=random_profit(),
+        register_link=REGISTER_LINK,
+        reactions=random_reactions()
+    )
+    
+    await bot.send_message(
+        chat_id=chat_id,
+        text=message,
+        parse_mode='Markdown',
+        disable_web_page_preview=True
+    )
+    logger.info(f"Success message sent to {chat_id}")
 
 async def send_goodnight_to_chat(chat_id):
     """Send goodnight message to a specific chat"""
@@ -349,6 +353,7 @@ async def main():
     last_signal_time = None
     last_registration_time = None
     goodnight_sent = False
+    signal_queue = []  # List to store (bet_time, multiplier) tuples
     
     while True:
         try:
@@ -358,13 +363,24 @@ async def main():
             if now.time() < time(0, 35):
                 goodnight_sent = False
             
+            # Process success messages for signals whose bet time has passed
+            expired_signals = [(bet_time, multiplier) for bet_time, multiplier in signal_queue 
+                              if now >= bet_time + timedelta(minutes=1)]
+            for bet_time, multiplier in expired_signals:
+                logger.info(f"Sending success message for signal with Bet Time {bet_time.strftime('%I:%M %p')}")
+                await send_to_all_channels(send_success_to_chat)
+                signal_queue.remove((bet_time, multiplier))
+            
             # Signal time: 8 PM to 12:35 AM
             if is_signal_time():
-                # Send signal every 10-20 minutes
-                signal_interval = random.randint(600, 1200)  # 10-20 minutes
+                # Send signal every 20 minutes
+                signal_interval = 1200  # 20 minutes in seconds
                 if last_signal_time is None or (now - last_signal_time).total_seconds() >= signal_interval:
+                    bet_time = get_bet_time()
+                    multiplier = random_multiplier()
                     logger.info(f"Sending signal with interval {signal_interval} seconds")
-                    await send_to_all_channels(send_signal_to_chat)
+                    await send_to_all_channels(lambda chat_id: send_signal_to_chat(chat_id, bet_time, multiplier))
+                    signal_queue.append((bet_time, multiplier))
                     last_signal_time = now
                     
                     # If last signal, send goodnight message and wait
@@ -375,7 +391,7 @@ async def main():
                         goodnight_sent = True
                         await asyncio.sleep(300)  # Wait 5 minutes
                     else:
-                        await asyncio.sleep(signal_interval)  # Wait for the chosen interval
+                        await asyncio.sleep(signal_interval)  # Wait 20 minutes
                 else:
                     await asyncio.sleep(60)  # Check every minute
             
@@ -418,6 +434,30 @@ async def main():
         except Exception as e:
             logger.error(f"Error in main loop: {e}")
             await asyncio.sleep(60)  # Retry after 1 minute
+
+def is_signal_time():
+    """Check if current time is between 8 PM and 12:35 AM"""
+    now = datetime.now(ZoneInfo(TIMEZONE))
+    current_time = now.time()
+    return time(20, 0) <= current_time or current_time <= time(0, 35)
+
+def is_last_signal_time():
+    """Check if current time is between 12:30 AM and 12:35 AM"""
+    now = datetime.now(ZoneInfo(TIMEZONE))
+    current_time = now.time()
+    return time(0, 30) <= current_time <= time(0, 35)
+
+def is_registration_reminder_time():
+    """Check if current time is within 5 minutes of 9 AM, 1 PM, 4 PM, or 7 PM"""
+    now = datetime.now(ZoneInfo(TIMEZONE))
+    current_time = now.time()
+    target_times = [time(9, 0), time(13, 0), time(16, 0), time(19, 0)]
+    for target in target_times:
+        if (current_time.hour == target.hour and 
+            current_time.minute >= target.minute and 
+            current_time.minute <= target.minute + 5):
+            return True
+    return False
 
 # Flask endpoint for Render health check
 @app.route('/health')
