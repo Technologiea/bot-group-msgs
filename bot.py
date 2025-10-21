@@ -36,7 +36,7 @@ if not GROUP_CHAT_IDS or not any(GROUP_CHAT_IDS):
 bot = Bot(token=BOT_TOKEN)
 app = Flask(__name__)
 
-# Signal message templates for 8 PM to 12:35 AM
+# Signal message templates for 8 PM to 12:30 AM (2 signals per hour)
 SIGNAL_TEMPLATES = [
     """🚀 *LUCKYJET SIGNAL ALERT* 🚀
 
@@ -51,6 +51,8 @@ SIGNAL_TEMPLATES = [
 👉 [DEPOSIT NOW]({register_link})
 
 ⚡ Turn **{currency_symbol}10** into **{currency_symbol}60+**!
+
+💬 *DM @DOREN99 for support and help.*
 {reactions}""",
 
     """🎰 *WINNING SIGNAL CONFIRMED* 🎰
@@ -66,6 +68,8 @@ SIGNAL_TEMPLATES = [
 👉 [DEPOSIT NOW]({register_link})
 
 🚀 **{currency_symbol}20** can become **{currency_symbol}100+**!
+
+💬 *DM @DOREN99 for support and help.*
 {reactions}""",
 
     """🏆 *PROVEN WIN SIGNAL* 🏆
@@ -81,36 +85,8 @@ SIGNAL_TEMPLATES = [
 👉 [DEPOSIT NOW]({register_link})
 
 ⚡ Start with **{currency_symbol}10** and win big!
-{reactions}""",
 
-    """📈 *HIGH PROBABILITY ALERT* 📈
-
-💰 *Join now for 500% BONUS!* Don’t miss out!
-
-🕒 Bet Time: {bet_time}
-🎯 Cash Out Target: {multiplier}x
-
-✨ *Winners trust our signals!*
-
-🔗 [REGISTER NOW]({register_link}) 
-👉 [DEPOSIT NOW]({register_link})
-
-🚀 **{currency_symbol}10** to millions!
-{reactions}""",
-
-    """🎉 *USER SUCCESS SIGNAL* 🎉
-
-🔥 *Players cashed out big last night!* **500% BONUS** awaits!
-
-⏰ Bet Time: {bet_time}
-🎯 Cash Out Target: {multiplier}x
-
-🌟 *Your turn to win is NOW!*
-
-🔗 [REGISTER NOW]({register_link}) 
-👉 [DEPOSIT NOW]({register_link})
-
-⚡ **{currency_symbol}20** can soar high!
+💬 *DM @DOREN99 for support and help.*
 {reactions}"""
 ]
 
@@ -129,6 +105,8 @@ LAST_SIGNAL_TEMPLATE = """⚠️ *LAST SIGNAL OF THE DAY* ⚠️
 👉 [DEPOSIT NOW]({register_link})
 
 ⚡ **{currency_symbol}10** can multiply fast!
+
+💬 *DM @DOREN99 for support and help.*
 {reactions}"""
 
 # Success message template after each signal
@@ -140,12 +118,13 @@ SUCCESS_TEMPLATE = """🎉 *SIGNAL PASSED SUCCESSFULLY!* 🎉
 🔗 [REGISTER NOW]({register_link}) 
 👉 [DEPOSIT NOW]({register_link})
 
+💬 *DM @DOREN99 for support and help.*
 {reactions}"""
 
 # Goodnight message template after last signal
 GOODNIGHT_TEMPLATE = """🌙 *GOODNIGHT, WINNERS!* 🌙
 
-🎉 *Today’s signals rocked!* Ready for more tomorrow?
+🎉 *Today's signals rocked!* Ready for more tomorrow?
 
 🔥 *Sign up now for 500% BONUS* and join our winning team!
 
@@ -153,6 +132,8 @@ GOODNIGHT_TEMPLATE = """🌙 *GOODNIGHT, WINNERS!* 🌙
 👉 [DEPOSIT NOW]({register_link})
 
 ⏰ *Next signals start at 8 PM tomorrow!*
+
+💬 *DM @DOREN99 for support and help.*
 {reactions}"""
 
 # Registration message templates for 9 AM, 1 PM, 4 PM, and 7 PM
@@ -171,20 +152,24 @@ Kickstart your day with a **500% BONUS**! Thousands are winning with our signals
 
 📈 *Tip:* Bet at signal time, cash out at target!
 ⚡ Free signals at **8 PM tonight**!
+
+💬 *DM @DOREN99 for support and help.*
 {reactions}""",
 
     """☀️ *AFTERNOON HURRY* ☀️
 
-Don’t miss tonight’s signals! **500% BONUS** on your first deposit!
+Don't miss tonight's signals! **500% BONUS** on your first deposit!
 
-🎯 *Tonight’s Plan:*
-⏰ **8 PM - 12:35 AM**: Signals every 20 min
+🎯 *Tonight's Plan:*
+⏰ **8 PM - 12:30 AM**: 2 signals per hour
 
 🔗 [REGISTER NOW]({register_link}) 
 👉 [DEPOSIT NOW]({register_link})
 
 📈 *Tip:* Bet at signal time, cash out at target!
 ⚡ Join now for **8 PM signals**!
+
+💬 *DM @DOREN99 for support and help.*
 {reactions}""",
 
     """🌇 *EVENING RUSH* 🌇
@@ -201,21 +186,26 @@ Last chance to join before **8 PM signals**! Get **500% BONUS** now!
 
 📈 *Tip:* Bet at signal time, cash out at target!
 ⚡ **8 PM signals await**!
+
+💬 *DM @DOREN99 for support and help.*
 {reactions}""",
 
     """🔥 *HYPE ALERT: SIGNALS SOON* 🔥
 
 **1 hour until 8 PM signals**! Sign up for **500% BONUS** now!
 
-🎯 *Tonight’s wins:*
+🎯 *Tonight's schedule:*
+✅ **8 PM - 12:30 AM**: 2 signals per hour
 ✅ **High multipliers**
-✅ **Real-time signals**
+✅ **Real-time alerts**
 
 🔗 [REGISTER NOW]({register_link}) 
 👉 [DEPOSIT NOW]({register_link})
 
 📈 *Tip:* Bet at signal time, cash out at target!
 ⚡ **Get ready for 8 PM**!
+
+💬 *DM @DOREN99 for support and help.*
 {reactions}"""
 ]
 
@@ -360,7 +350,7 @@ async def main():
             now = datetime.now(ZoneInfo(TIMEZONE))
             
             # Reset goodnight flag daily
-            if now.time() < time(0, 35):
+            if now.time() < time(0, 30):
                 goodnight_sent = False
             
             # Process success messages for signals whose bet time has passed
@@ -371,14 +361,18 @@ async def main():
                 await send_to_all_channels(send_success_to_chat)
                 signal_queue.remove((bet_time, multiplier))
             
-            # Signal time: 8 PM to 12:35 AM
+            # Signal time: 8 PM to 12:30 AM (2 signals per hour)
             if is_signal_time():
-                # Send signal every 20 minutes
-                signal_interval = 1200  # 20 minutes in seconds
-                if last_signal_time is None or (now - last_signal_time).total_seconds() >= signal_interval:
+                # Send signals at :00 and :30 of each hour
+                current_minute = now.minute
+                
+                # Check if it's time for a signal (:00 or :30 minute)
+                if current_minute in [0, 30] and (last_signal_time is None or 
+                    (now - last_signal_time).total_seconds() >= 1200):  # 20 minutes minimum gap
+                    
                     bet_time = get_bet_time()
                     multiplier = random_multiplier()
-                    logger.info(f"Sending signal with interval {signal_interval} seconds")
+                    logger.info(f"Sending signal at {now.strftime('%H:%M')}")
                     await send_to_all_channels(lambda chat_id: send_signal_to_chat(chat_id, bet_time, multiplier))
                     signal_queue.append((bet_time, multiplier))
                     last_signal_time = now
@@ -390,10 +384,8 @@ async def main():
                         await send_to_all_channels(send_goodnight_to_chat)
                         goodnight_sent = True
                         await asyncio.sleep(300)  # Wait 5 minutes
-                    else:
-                        await asyncio.sleep(signal_interval)  # Wait 20 minutes
                 else:
-                    await asyncio.sleep(60)  # Check every minute
+                    await asyncio.sleep(30)  # Check every 30 seconds
             
             # Registration reminder time: 9 AM, 1 PM, 4 PM, 7 PM
             elif is_registration_reminder_time():
@@ -410,6 +402,7 @@ async def main():
                 # Calculate sleep time until next active period
                 current_time = now.time()
                 next_time = None
+                
                 if current_time < time(9, 0):
                     next_time = datetime.combine(now.date(), time(9, 0), tzinfo=ZoneInfo(TIMEZONE))
                 elif current_time < time(13, 0):
@@ -421,7 +414,7 @@ async def main():
                 elif current_time < time(20, 0):
                     next_time = datetime.combine(now.date(), time(20, 0), tzinfo=ZoneInfo(TIMEZONE))
                 else:
-                    # After 12:35 AM, wait until 9 AM next day
+                    # After 12:30 AM, wait until 9 AM next day
                     next_time = datetime.combine(now.date() + timedelta(days=1), time(9, 0), tzinfo=ZoneInfo(TIMEZONE))
                 
                 sleep_seconds = (next_time - now).total_seconds()
@@ -436,16 +429,16 @@ async def main():
             await asyncio.sleep(60)  # Retry after 1 minute
 
 def is_signal_time():
-    """Check if current time is between 8 PM and 12:35 AM"""
+    """Check if current time is between 8 PM and 12:30 AM"""
     now = datetime.now(ZoneInfo(TIMEZONE))
     current_time = now.time()
-    return time(20, 0) <= current_time or current_time <= time(0, 35)
+    return time(20, 0) <= current_time or current_time <= time(0, 30)
 
 def is_last_signal_time():
-    """Check if current time is between 12:30 AM and 12:35 AM"""
+    """Check if current time is between 12:25 AM and 12:30 AM"""
     now = datetime.now(ZoneInfo(TIMEZONE))
     current_time = now.time()
-    return time(0, 30) <= current_time <= time(0, 35)
+    return time(0, 25) <= current_time <= time(0, 30)
 
 def is_registration_reminder_time():
     """Check if current time is within 5 minutes of 9 AM, 1 PM, 4 PM, or 7 PM"""
