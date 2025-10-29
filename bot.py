@@ -12,9 +12,9 @@ import threading
 # --- CONFIGURATION ---
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 GROUP_CHAT_IDS = os.getenv('GROUP_CHAT_IDS', '').split(',')
-REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://1win.com')
+REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://lkpq.cc/eec3')
 TIMEZONE = os.getenv('TIMEZONE', 'Asia/Kolkata')
-CURRENCY_SYMBOL = os.getenv('CURRENCY_SYMBOL', '$')
+CURRENCY_SYMBOL = os.getenv('CURRENCY_SYMBOL', '₹')
 PORT = int(os.getenv('PORT', 5000))
 # --- CONFIGURATION ---
 
@@ -36,315 +36,242 @@ if not GROUP_CHAT_IDS or not any(GROUP_CHAT_IDS):
 bot = Bot(token=BOT_TOKEN)
 app = Flask(__name__)
 
-# Signal message templates for specific times
-SIGNAL_TEMPLATES = [
-    """🏆 *PROVEN WIN SIGNAL* 🏆
-
-🔥 *Last signal hit 5x! Get 500% BONUS now!*
-
-⏰ Bet Time: {bet_time}
-🎯 Cash Out Target: {multiplier}x
-
-🌟 *Be the next winner!*
-
-🔗 [REGISTER NOW]({register_link}) 
-👉 [DEPOSIT NOW]({register_link})
-
-⚡ *Join 1Win Lucky Jet - Your Path to Daily $1000+*
-
-💬 *DM @DOREN99 for support and help.*
-{reactions}""",
-
-    """🚀 *ELITE WINNING SIGNAL* 🚀
-
-💎 *Special Bonus:* **500% EXTRA** on first deposit!
-
-🕒 Bet Time: {bet_time}
-📈 Target Multiplier: {multiplier}x
-
-💰 *Daily $1000+ Earnings Possible!*
-
-🔗 [REGISTER NOW]({register_link}) 
-👉 [DEPOSIT NOW]({register_link})
-
-🌟 *1Win Partner - Trusted by Thousands*
-
-💬 *DM @DOREN99 for support and help.*
-{reactions}""",
-
-    """⭐ *PREMIUM 1WIN SIGNAL* ⭐
-
-🎯 *Proven Strategy for Consistent Wins!*
-
-⏰ Bet Time: {bet_time}
-🎯 Cash Out Target: {multiplier}x
-
-💵 *Earn $1000+ Daily with Our Signals*
-
-🔗 [REGISTER NOW]({register_link}) 
-👉 [DEPOSIT NOW]({register_link})
-
-🔥 *Join the Winning Team Today!*
-
-💬 *DM @DOREN99 for support and help.*
-{reactions}"""
+# Dynamic high-engagement windows: (hype_time_str, bet_time_str) in 12h format for display
+PEAK_WINDOWS = [
+    ("10:35 AM", "11:00 AM"),  # Morning rush
+    ("1:40 PM", "2:05 PM"),    # Lunch break surge (adjusted for +20min)
+    ("2:50 PM", "3:15 PM"),    # Post-lunch dopamine
+    ("6:40 PM", "7:05 PM"),    # Evening unwind
+    ("8:55 PM", "9:20 PM"),    # Prime time hype
+    ("11:45 PM", "12:10 AM")   # Midnight gamblers
 ]
 
-# Success message template after each signal
-SUCCESS_TEMPLATE = """🎉 *SIGNAL PASSED SUCCESSFULLY!* 🎉
+# Pre-signal hype template
+HYPE_TEMPLATE = """LIVE ALERT: LUCKY JET VOLATILITY SPIKE DETECTED
 
-💰 *EARNED PROFIT: {currency_symbol}{profit:,}!*
-🔥 *IT'S YOUR TIME TO EARN NOW!*
+🔥 Our AI just flagged a **{multiplier_preview}x potential ascent** in the next 25 mins.
 
-💵 *Daily Target: $1000+ Achievable!*
-🚀 *Next Signal Coming Soon!*
+💎 **Only 50 elite spots open** for this 1win Lucky Jet signal.
 
-🔗 [REGISTER NOW]({register_link}) 
-👉 [DEPOSIT NOW]({register_link})
+👥 **Current online:** {online_count} warriors  
+⚡ **Deposits live:** {deposits_live} in last 10 mins
 
-🌟 *1Win Lucky Jet - Your Gateway to Financial Freedom*
+⏰ Signal drops in **T-20 mins** – Prepare to execute.
 
-💬 *DM @DOREN99 for support and help.*
-{reactions}"""
+🔗 [SECURE 500% BONUS NOW]({register_link})
+👉 [DEPOSIT & LOCK YOUR SPOT]({register_link})
 
-# Morning registration message for 10:35 AM
-MORNING_SIGNAL_TEMPLATE = """🏆 *PROVEN WIN SIGNAL* 🏆
+💬 DM @DOREN99 — "I'M IN" for priority access."""
 
-🔥 *Last signal hit 5x! Get 500% BONUS now!*
+# Elite signal template
+SIGNAL_TEMPLATE = """🚀 *ELITE LUCKY JET SIGNAL DEPLOYED* 🚀
 
-⏰ Bet Time: 11:00 AM
-🎯 Cash Out Target: {multiplier}x
+⏰ **Bet Entry:** NOW ({bet_time})
+🎯 **Cashout Target:** {multiplier}x
 
-🌟 *Be the next winner!*
+📊 **Live Proof:** Last 3 signals → 5.2x | 7.9x | **11.4x**
+💹 **1win RTP Edge:** 97.3% this hour (verified analytics)
 
-🔗 [REGISTER NOW]({register_link}) 
-👉 [DEPOSIT NOW]({register_link})
+🛡️ **Spots left:** 12 / 50 – High engagement window active.
 
-💵 *Start Your Journey to Daily $2000 Earnings!*
+🔥 Transform {currency_symbol}500 into {currency_symbol}3,000+ with 500% bonus.
 
-💬 *DM @DOREN99 for support and help.*
-{reactions}"""
+🔗 [DEPOSIT ₹500 → PLAY ₹3,000]({register_link})
 
-# Daily earnings motivation template
-EARNINGS_TEMPLATE = """💸 *DAILY EARNINGS UPDATE* 💸
+**Winners execute. Losers hesitate.**
 
-📊 *Today's Total: {currency_symbol}{daily_total:,}*
-🎯 *Next Target: {currency_symbol}{next_target:,}*
+💬 DM @DOREN99: "EXECUTED" → Unlock next signal **FREE**."""
 
-🔥 *Consistent $1000+ Daily Earnings!*
-🚀 *Join Our Winning Team Now!*
+# Success blast template
+SUCCESS_TEMPLATE = """✅ *SIGNAL EXECUTED: +{multiplier}x LOCKED* ✅
 
-✨ *Why Choose 1Win Lucky Jet?*
-✅ **Proven Signals**
-✅ **Instant Withdrawals** 
-✅ **24/7 Support**
-✅ **500% Welcome Bonus**
+💰 **Group Profit:** {currency_symbol}{profit:,}+  
+🏅 **Top Winner:** {currency_symbol}47,000 → {currency_symbol}517,000
 
-🔗 [REGISTER NOW]({register_link}) 
-👉 [DEPOSIT NOW]({register_link})
+🔥 **Trend Confirmed:** Volatility climbing – Next play = **12x+ potential**
 
-💬 *DM @DOREN99 for support and help.*
-{reactions}"""
+⏰ **Next signal:** T-45 mins. **Spots filling fast.** (Peak engagement ahead)
 
-# Emoji reactions with specified frequencies
-REACTION_WEIGHTS = {
-    "🔥": 5,  # 5 times more likely
-    "💰": 3,  # 3 times more likely
-    "💸": 3,  # 3 times more likely
-    "🚀": 2,  # 2 times more likely
-    "⭐": 5,  # 5 times more likely
-    "💎": 1,  # Standard weight
-    "✨": 2,  # 2 times more likely
-    "🏆": 3,  # Winning theme
-    "📈": 3   # Winning theme
-}
+⚠️ **Non-depositors missed:** ₹37,000 avg profit.
 
-def random_multiplier():
-    return round(random.uniform(1.5, 12.5), 2)
+🔗 [DEPOSIT NOW & JOIN THE 1% WINNERS]({register_link})
+
+💡 **Pro Move:** Scale deposits, lock wins – 1win's seamless payouts await.
+
+💬 DM @DOREN99: "NEXT" → Reserve your elite seat."""
+
+def parse_time_str(time_str):
+    """Parse 12h time str to datetime.time"""
+    try:
+        return datetime.strptime(time_str, "%I:%M %p").time()
+    except:
+        return None
+
+def get_bet_time_from_window(window_idx):
+    """Get bet time for today or tomorrow based on window"""
+    bet_str = PEAK_WINDOWS[window_idx][1]
+    bet_time_obj = parse_time_str(bet_str)
+    now = datetime.now(ZoneInfo(TIMEZONE))
+    bet_today = datetime.combine(now.date(), bet_time_obj, tzinfo=ZoneInfo(TIMEZONE))
+    if now > bet_today:
+        bet_today += timedelta(days=1)
+    return bet_today
+
+def random_high_multiplier():
+    return round(random.uniform(5.0, 15.0), 2)
 
 def random_profit():
-    return random.randint(500, 2000)  # Profits in dollars $500-$2000
+    return random.randint(50000, 200000) // 1000 * 1000  # Aspirational ₹50k-₹200k
 
-def random_daily_total():
-    return random.randint(1000, 3000)  # Daily totals $1000-$3000
+def approximate_online_count():
+    """Fallback approximation for high engagement (simulate >150)"""
+    return random.randint(100, 300)  # Assume high during peaks
 
-def random_reactions():
-    weighted_emojis = []
-    for emoji, weight in REACTION_WEIGHTS.items():
-        weighted_emojis.extend([emoji] * weight)
-    return " ".join(random.sample(weighted_emojis, 5))
+async def get_engagement_estimate():
+    """Estimate total online/deposits across groups"""
+    total_members = 0
+    for chat_id in GROUP_CHAT_IDS:
+        try:
+            chat = await bot.get_chat(chat_id.strip())
+            total_members += chat.get_members_count() or 0
+        except:
+            pass
+    # Simulate online as fraction + random for dynamism
+    online_estimate = int(total_members * 0.1 + random.randint(50, 200))
+    deposits_live = random.randint(20, 60)
+    return max(online_estimate, 150), deposits_live  # Threshold enforced
+
+async def should_deploy_signal(window_idx):
+    """Check if in peak window and engagement high"""
+    now = datetime.now(ZoneInfo(TIMEZONE))
+    hype_str, bet_str = PEAK_WINDOWS[window_idx]
+    current_str = now.strftime("%I:%M %p").upper()
+    if hype_str not in current_str and bet_str not in current_str:
+        return False
+    online, _ = await get_engagement_estimate()
+    return online > 150  # Dynamic check
 
 async def send_to_all_channels(message_func):
-    """Helper function to send messages to all channels"""
     for chat_id in GROUP_CHAT_IDS:
         if not chat_id.strip():
             continue
         try:
             await message_func(chat_id.strip())
-            await asyncio.sleep(1)  # Avoid rate limiting
+            await asyncio.sleep(1)
         except TelegramError as e:
             logger.error(f"Error sending to {chat_id}: {e}")
 
+async def send_hype_to_chat(chat_id, multiplier_preview, online_count, deposits_live):
+    message = HYPE_TEMPLATE.format(
+        multiplier_preview=multiplier_preview,
+        online_count=online_count,
+        deposits_live=deposits_live,
+        register_link=REGISTER_LINK
+    )
+    await bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', disable_web_page_preview=True)
+    logger.info(f"Hype sent to {chat_id}")
+
 async def send_signal_to_chat(chat_id, bet_time, multiplier):
-    """Send signal to a specific chat"""
-    message = random.choice(SIGNAL_TEMPLATES).format(
-        bet_time=bet_time,
+    message = SIGNAL_TEMPLATE.format(
+        bet_time=bet_time.strftime("%I:%M %p"),
         multiplier=multiplier,
-        register_link=REGISTER_LINK,
-        reactions=random_reactions()
+        currency_symbol=CURRENCY_SYMBOL,
+        register_link=REGISTER_LINK
     )
-    
-    await bot.send_message(
-        chat_id=chat_id,
-        text=message,
-        parse_mode='Markdown',
-        disable_web_page_preview=True
-    )
-    logger.info(f"Signal sent to {chat_id} for Bet Time {bet_time}")
+    await bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', disable_web_page_preview=True)
+    logger.info(f"Signal deployed to {chat_id} for {bet_time}")
 
-async def send_morning_signal_to_chat(chat_id, multiplier):
-    """Send morning signal to a specific chat"""
-    message = MORNING_SIGNAL_TEMPLATE.format(
-        multiplier=multiplier,
-        register_link=REGISTER_LINK,
-        reactions=random_reactions()
-    )
-    
-    await bot.send_message(
-        chat_id=chat_id,
-        text=message,
-        parse_mode='Markdown',
-        disable_web_page_preview=True
-    )
-    logger.info(f"Morning signal sent to {chat_id}")
-
-async def send_success_to_chat(chat_id):
-    """Send success message to a specific chat"""
+async def send_success_to_chat(chat_id, multiplier, profit):
     message = SUCCESS_TEMPLATE.format(
+        multiplier=multiplier,
+        profit=profit,
         currency_symbol=CURRENCY_SYMBOL,
-        profit=random_profit(),
-        register_link=REGISTER_LINK,
-        reactions=random_reactions()
+        register_link=REGISTER_LINK
     )
-    
-    await bot.send_message(
-        chat_id=chat_id,
-        text=message,
-        parse_mode='Markdown',
-        disable_web_page_preview=True
-    )
-    logger.info(f"Success message sent to {chat_id}")
-
-async def send_earnings_to_chat(chat_id):
-    """Send daily earnings motivation message"""
-    message = EARNINGS_TEMPLATE.format(
-        currency_symbol=CURRENCY_SYMBOL,
-        daily_total=random_daily_total(),
-        next_target=random.randint(1000, 2000),
-        register_link=REGISTER_LINK,
-        reactions=random_reactions()
-    )
-    
-    await bot.send_message(
-        chat_id=chat_id,
-        text=message,
-        parse_mode='Markdown',
-        disable_web_page_preview=True
-    )
-    logger.info(f"Earnings motivation sent to {chat_id}")
+    await bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', disable_web_page_preview=True)
+    logger.info(f"Success blast to {chat_id} with {multiplier}x")
 
 async def main():
-    logger.info("1Win Lucky Jet Bot started successfully...")
-    print("Bot is running. Press Ctrl+C to stop.")
+    logger.info("Dynamic Engine DEPLOYED: Hunting peak engagement for $2K+ daily.")
+    print("Profit missile active. Targeting 6x signals/day in high-engagement windows.")
     
-    signal_times = [
-        (10, 35),  # 10:35 AM - Morning signal announcement
-        (11, 0),   # 11:00 AM - First signal
-        (11, 5),   # 11:05 AM - Success message
-        (14, 0),   # 2:00 PM - Second signal
-        (14, 5),   # 2:05 PM - Success message
-        (15, 0),   # 3:00 PM - Third signal
-        (15, 5),   # 3:05 PM - Success message
-        (19, 0),   # 7:00 PM - Fourth signal
-        (19, 5),   # 7:05 PM - Success message
-        (21, 0),   # 9:00 PM - Fifth signal
-        (21, 5),   # 9:05 PM - Success message
-        (0, 0),    # 12:00 AM - Sixth signal
-        (0, 5)     # 12:05 AM - Success message
-    ]
-    
-    last_signal_time = None
-    daily_earnings_sent = False
+    daily_signals = set()  # Track deployed per day (window_idx)
     
     while True:
         try:
             now = datetime.now(ZoneInfo(TIMEZONE))
-            current_time = now.time()
+            today_str = now.date().isoformat()
             
-            # Reset daily earnings flag at 10 AM
-            if current_time.hour == 10 and current_time.minute == 0:
-                daily_earnings_sent = False
+            # Reset daily at midnight
+            if now.hour == 0 and now.minute == 0:
+                daily_signals.clear()
             
-            # Check if it's time for any scheduled signal
-            for hour, minute in signal_times:
-                if (current_time.hour == hour and 
-                    current_time.minute == minute and 
-                    (last_signal_time is None or 
-                     (now - last_signal_time).total_seconds() >= 300)):  # 5 minutes minimum gap
-                    
-                    if (hour, minute) == (10, 35):
-                        # Morning signal announcement
-                        logger.info("Sending morning signal announcement")
-                        multiplier = random_multiplier()
-                        await send_to_all_channels(lambda chat_id: send_morning_signal_to_chat(chat_id, multiplier))
-                    
-                    elif minute == 0:  # Signal time (XX:00)
-                        logger.info(f"Sending signal for {hour:02d}:{minute:02d}")
-                        multiplier = random_multiplier()
-                        bet_time = f"{hour:02d}:{minute:02d} {'AM' if hour < 12 else 'PM'}"
-                        await send_to_all_channels(lambda chat_id: send_signal_to_chat(chat_id, bet_time, multiplier))
-                    
-                    elif minute == 5:  # Success message (XX:05)
-                        logger.info(f"Sending success message for {hour:02d}:{minute:02d}")
-                        await send_to_all_channels(send_success_to_chat)
-                        
-                        # Send daily earnings motivation after 2 PM success
-                        if hour == 14 and not daily_earnings_sent:
-                            await asyncio.sleep(2)
-                            logger.info("Sending daily earnings motivation")
-                            await send_to_all_channels(send_earnings_to_chat)
-                            daily_earnings_sent = True
-                    
-                    last_signal_time = now
-                    await asyncio.sleep(60)  # Wait 1 minute before next check
-                    break
+            deployed_today = len(daily_signals) >= len(PEAK_WINDOWS)
+            
+            for idx in range(len(PEAK_WINDOWS)):
+                if idx in daily_signals:
+                    continue
+                
+                bet_time = get_bet_time_from_window(idx)
+                hype_time = bet_time - timedelta(minutes=20)
+                success_time = bet_time + timedelta(minutes=5)
+                
+                # Hype deployment (20 min before bet)
+                if abs((now - hype_time).total_seconds()) <= 60:
+                    online, deposits = await get_engagement_estimate()
+                    if online > 150:
+                        multiplier_preview = random_high_multiplier()
+                        logger.info(f"Deploying hype for window {idx}")
+                        await send_to_all_channels(
+                            lambda cid: send_hype_to_chat(cid, multiplier_preview, online, deposits)
+                        )
+                        await asyncio.sleep(60)
+                    else:
+                        logger.info(f"Low engagement, skipping hype for {idx}")
+                
+                # Signal deployment (at bet time)
+                elif abs((now - bet_time).total_seconds()) <= 60:
+                    online, _ = await get_engagement_estimate()
+                    if online > 150 and idx not in daily_signals:
+                        multiplier = random_high_multiplier()
+                        logger.info(f"Deploying signal for window {idx}")
+                        await send_to_all_channels(lambda cid: send_signal_to_chat(cid, bet_time, multiplier))
+                        daily_signals.add(idx)
+                        # Store for success (simple: use last multiplier)
+                        last_multiplier = multiplier
+                        await asyncio.sleep(60)
+                    else:
+                        logger.info(f"Engagement check failed or already sent for {idx}")
+                
+                # Success blast (5 min after)
+                elif abs((now - success_time).total_seconds()) <= 60 and idx in daily_signals:
+                    profit = random_profit()
+                    logger.info(f"Blasting success for window {idx}")
+                    await send_to_all_channels(lambda cid: send_success_to_chat(cid, last_multiplier, profit))
+                    await asyncio.sleep(300)  # Cooldown after success
+            
+            if not deployed_today:
+                await asyncio.sleep(30)  # Frequent checks during day
             else:
-                # No signal time matched, sleep until next minute
-                next_minute = now.replace(second=0, microsecond=0) + timedelta(minutes=1)
-                sleep_seconds = (next_minute - now).total_seconds()
-                if sleep_seconds > 0:
-                    await asyncio.sleep(sleep_seconds)
-                else:
-                    await asyncio.sleep(30)  # Fallback
-                    
+                # Sleep to next day first window
+                next_day_first = datetime.combine(now.date() + timedelta(days=1), parse_time_str(PEAK_WINDOWS[0][1]), tzinfo=ZoneInfo(TIMEZONE))
+                sleep_sec = (next_day_first - now).total_seconds()
+                logger.info(f"All signals deployed. Sleeping {sleep_sec/3600:.1f} hrs to next cycle.")
+                await asyncio.sleep(sleep_sec)
+            
         except Exception as e:
-            logger.error(f"Error in main loop: {e}")
-            await asyncio.sleep(60)  # Retry after 1 minute
+            logger.error(f"Engine error: {e}")
+            await asyncio.sleep(60)
 
-# Flask endpoint for Render health check
 @app.route('/health')
 def health_check():
-    return jsonify({"status": "ok", "message": "1Win Lucky Jet bot is running"})
+    return jsonify({"status": "dynamic", "target": "$2K+ daily conversions"})
 
 def run_bot():
-    """Run the bot in a separate thread"""
     asyncio.run(main())
 
 if __name__ == "__main__":
-    # Start the bot in a separate thread
     bot_thread = threading.Thread(target=run_bot)
     bot_thread.daemon = True
     bot_thread.start()
-    
-    # Start Flask app for Render port binding
     app.run(host='0.0.0.0', port=PORT)
