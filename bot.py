@@ -8,127 +8,133 @@ from telegram import Bot
 from telegram.error import TelegramError
 from flask import Flask, jsonify
 import threading
+import pytz
 
-# --- CONFIGURATION ---
+# --- GLOBAL CONFIGURATION ---
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 GROUP_CHAT_IDS = os.getenv('GROUP_CHAT_IDS', '').split(',')
 REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://lkpq.cc/eec3')
-TIMEZONE = os.getenv('TIMEZONE', 'Asia/Kolkata')
-CURRENCY_SYMBOL = os.getenv('CURRENCY_SYMBOL', '₹')
+CURRENCY_SYMBOL = os.getenv('CURRENCY_SYMBOL', '$')  # Default to USD for global
 PORT = int(os.getenv('PORT', 5000))
-# --- CONFIGURATION ---
+# --- END CONFIG ---
 
-# Set up logging
+# Logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# Validate environment variables
+# Validation
 if not BOT_TOKEN:
-    logger.error("BOT_TOKEN is not set!")
+    logger.error("BOT_TOKEN missing!")
     exit(1)
 if not GROUP_CHAT_IDS or not any(GROUP_CHAT_IDS):
-    logger.error("No GROUP_CHAT_IDS configured!")
+    logger.error("No GROUP_CHAT_IDS!")
     exit(1)
 
 bot = Bot(token=BOT_TOKEN)
 app = Flask(__name__)
 
-# Dynamic high-engagement windows: (hype_time_str, bet_time_str) in 12h format for display
-PEAK_WINDOWS = [
-    ("10:35 AM", "11:00 AM"),  # Morning rush
-    ("1:40 PM", "2:05 PM"),    # Lunch break surge (adjusted for +20min)
-    ("2:50 PM", "3:15 PM"),    # Post-lunch dopamine
-    ("6:40 PM", "7:05 PM"),    # Evening unwind
-    ("8:55 PM", "9:20 PM"),    # Prime time hype
-    ("11:45 PM", "12:10 AM")   # Midnight gamblers
+# === GLOBAL PEAK ENGAGEMENT WINDOWS (UTC) ===
+# Based on 1win global traffic: India, Brazil, CIS, Turkey, Africa, SEA
+GLOBAL_PEAK_WINDOWS_UTC = [
+    ("05:35", "06:00"),  # 11:05 IST (India morning)
+    ("08:40", "09:05"),  # 14:10 IST (India lunch) / 10:10 TRT (Turkey)
+    ("09:50", "10:15"),  # 15:20 IST / 11:20 TRT / 13:20 MSK
+    ("13:40", "14:05"),  # 19:10 IST (India prime) / 15:10 TRT / 17:10 MSK
+    ("15:55", "16:20"),  # 21:25 IST (India night) / 23:25 MSK / 03:25 BRT (Brazil)
+    ("18:45", "19:10"),  # 00:15 IST (Midnight India) / 06:15 BRT / 20:15 TRT
 ]
 
-# Pre-signal hype template
-HYPE_TEMPLATE = """LIVE ALERT: LUCKY JET VOLATILITY SPIKE DETECTED
+# === CURRENCY & LOCALIZATION MAP ===
+CURRENCY_MAP = {
+    "Asia/Kolkata": "₹",
+    "Europe/Moscow": "₽",
+    "Europe/Istanbul": "₺",
+    "America/Sao_Paulo": "$",
+    "Africa/Lagos": "₦",
+    "Asia/Jakarta": "Rp",
+    "default": "$"
+}
 
-🔥 Our AI just flagged a **{multiplier_preview}x potential ascent** in the next 25 mins.
+# === TEMPLATES (Global, High-Conversion, Urgency-Driven) ===
 
-💎 **Only 50 elite spots open** for this 1win Lucky Jet signal.
+HYPE_TEMPLATE = """GLOBAL ALERT: LUCKY JET ASCENT DETECTED
 
-👥 **Current online:** {online_count} warriors  
-⚡ **Deposits live:** {deposits_live} in last 10 mins
+AI flagged **{multiplier_preview}x surge** in next 25 mins.
 
-⏰ Signal drops in **T-20 mins** – Prepare to execute.
+**Only 100 elite global seats** open across 1win network.
 
-🔗 [SECURE 500% BONUS NOW]({register_link})
-👉 [DEPOSIT & LOCK YOUR SPOT]({register_link})
+**Live online:** {online_count}+ warriors  
+**Deposits surging:** {deposits_live} in 10 mins
 
-💬 DM @DOREN99 — "I'M IN" for priority access."""
+**T-20 mins** to signal drop. Position now.
 
-# Elite signal template
-SIGNAL_TEMPLATE = """🚀 *ELITE LUCKY JET SIGNAL DEPLOYED* 🚀
+[CLAIM 500% BONUS WORLDWIDE]({register_link})
+[DEPOSIT & SECURE SEAT]({register_link})
 
-⏰ **Bet Entry:** NOW ({bet_time})
-🎯 **Cashout Target:** {multiplier}x
+DM @DOREN99 — "GLOBAL IN" for priority."""
+    
+SIGNAL_TEMPLATE = """ELITE GLOBAL LUCKY JET SIGNAL
 
-📊 **Live Proof:** Last 3 signals → 5.2x | 7.9x | **11.4x**
-💹 **1win RTP Edge:** 97.3% this hour (verified analytics)
+**Bet NOW:** {bet_time_local}
+**Target Cashout:** {multiplier}x
 
-🛡️ **Spots left:** 12 / 50 – High engagement window active.
+**Live Proof:** Last 3 → 6.1x | 8.7x | **12.9x**
+**1win Global RTP:** 97.6% this hour (verified)
 
-🔥 Transform {currency_symbol}500 into {currency_symbol}3,000+ with 500% bonus.
+**Seats left:** 23 / 100
 
-🔗 [DEPOSIT ₹500 → PLAY ₹3,000]({register_link})
+{currency_symbol}50 → {currency_symbol}3,000+ with 500% bonus.
 
-**Winners execute. Losers hesitate.**
+[DEPOSIT & EXECUTE]({register_link})
 
-💬 DM @DOREN99: "EXECUTED" → Unlock next signal **FREE**."""
+**Global winners act. Others watch.**
 
-# Success blast template
-SUCCESS_TEMPLATE = """✅ *SIGNAL EXECUTED: +{multiplier}x LOCKED* ✅
+DM @DOREN99: "EXECUTED" → Next signal **FREE**."""
 
-💰 **Group Profit:** {currency_symbol}{profit:,}+  
-🏅 **Top Winner:** {currency_symbol}47,000 → {currency_symbol}517,000
+SUCCESS_TEMPLATE = """GLOBAL SIGNAL CRUSHED: +{multiplier}x
 
-🔥 **Trend Confirmed:** Volatility climbing – Next play = **12x+ potential**
+**Network Profit:** {currency_symbol}{profit:,}+  
+**Top Global Winner:** {currency_symbol}5,000 → {currency_symbol}67,000
 
-⏰ **Next signal:** T-45 mins. **Spots filling fast.** (Peak engagement ahead)
+**Next surge:** T-45 mins. **High volatility window active.**
 
-⚠️ **Non-depositors missed:** ₹37,000 avg profit.
+**Missed?** Avg user lost {currency_symbol}4,200 profit.
 
-🔗 [DEPOSIT NOW & JOIN THE 1% WINNERS]({register_link})
+[DEPOSIT NOW – JOIN GLOBAL 1%]({register_link})
 
-💡 **Pro Move:** Scale deposits, lock wins – 1win's seamless payouts await.
+**Trend:** Multipliers climbing globally. Next = **14x+**
 
-💬 DM @DOREN99: "NEXT" → Reserve your elite seat."""
+DM @DOREN99: "NEXT" → Reserve seat."""
 
-def parse_time_str(time_str):
-    """Parse 12h time str to datetime.time"""
+# === UTILS ===
+
+def get_local_time(utc_dt, timezone_str):
     try:
-        return datetime.strptime(time_str, "%I:%M %p").time()
+        tz = ZoneInfo(timezone_str)
+        return utc_dt.astimezone(tz)
     except:
-        return None
+        return utc_dt  # Fallback
 
-def get_bet_time_from_window(window_idx):
-    """Get bet time for today or tomorrow based on window"""
-    bet_str = PEAK_WINDOWS[window_idx][1]
-    bet_time_obj = parse_time_str(bet_str)
-    now = datetime.now(ZoneInfo(TIMEZONE))
-    bet_today = datetime.combine(now.date(), bet_time_obj, tzinfo=ZoneInfo(TIMEZONE))
-    if now > bet_today:
-        bet_today += timedelta(days=1)
-    return bet_today
+def detect_user_timezone(chat_id):
+    """Simulate timezone detection via chat language or known group"""
+    # In real bot: use user language + group metadata
+    # For now: cycle through major zones
+    zones = ["Asia/Kolkata", "Europe/Moscow", "Europe/Istanbul", "America/Sao_Paulo", "Africa/Lagos"]
+    return random.choice(zones)
+
+def get_currency(timezone):
+    return CURRENCY_MAP.get(timezone, CURRENCY_MAP["default"])
 
 def random_high_multiplier():
-    return round(random.uniform(5.0, 15.0), 2)
+    return round(random.uniform(6.0, 16.0), 2)
 
 def random_profit():
-    return random.randint(50000, 200000) // 1000 * 1000  # Aspirational ₹50k-₹200k
+    return random.randint(50000, 300000) // 1000 * 1000
 
-def approximate_online_count():
-    """Fallback approximation for high engagement (simulate >150)"""
-    return random.randint(100, 300)  # Assume high during peaks
-
-async def get_engagement_estimate():
-    """Estimate total online/deposits across groups"""
+async def get_global_engagement():
     total_members = 0
     for chat_id in GROUP_CHAT_IDS:
         try:
@@ -136,136 +142,126 @@ async def get_engagement_estimate():
             total_members += chat.get_members_count() or 0
         except:
             pass
-    # Simulate online as fraction + random for dynamism
-    online_estimate = int(total_members * 0.1 + random.randint(50, 200))
-    deposits_live = random.randint(20, 60)
-    return max(online_estimate, 150), deposits_live  # Threshold enforced
+    online = int(total_members * random.uniform(0.12, 0.28)) + random.randint(80, 400)
+    deposits = random.randint(35, 120)
+    return max(online, 200), deposits  # Global threshold
 
-async def should_deploy_signal(window_idx):
-    """Check if in peak window and engagement high"""
-    now = datetime.now(ZoneInfo(TIMEZONE))
-    hype_str, bet_str = PEAK_WINDOWS[window_idx]
-    current_str = now.strftime("%I:%M %p").upper()
-    if hype_str not in current_str and bet_str not in current_str:
-        return False
-    online, _ = await get_engagement_estimate()
-    return online > 150  # Dynamic check
-
-async def send_to_all_channels(message_func):
+async def send_to_all(message_func):
     for chat_id in GROUP_CHAT_IDS:
-        if not chat_id.strip():
-            continue
+        if not chat_id.strip(): continue
         try:
             await message_func(chat_id.strip())
             await asyncio.sleep(1)
         except TelegramError as e:
-            logger.error(f"Error sending to {chat_id}: {e}")
+            logger.error(f"Send error {chat_id}: {e}")
 
-async def send_hype_to_chat(chat_id, multiplier_preview, online_count, deposits_live):
-    message = HYPE_TEMPLATE.format(
-        multiplier_preview=multiplier_preview,
-        online_count=online_count,
-        deposits_live=deposits_live,
-        register_link=REGISTER_LINK
-    )
-    await bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', disable_web_page_preview=True)
-    logger.info(f"Hype sent to {chat_id}")
-
-async def send_signal_to_chat(chat_id, bet_time, multiplier):
-    message = SIGNAL_TEMPLATE.format(
-        bet_time=bet_time.strftime("%I:%M %p"),
-        multiplier=multiplier,
-        currency_symbol=CURRENCY_SYMBOL,
-        register_link=REGISTER_LINK
-    )
-    await bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', disable_web_page_preview=True)
-    logger.info(f"Signal deployed to {chat_id} for {bet_time}")
-
-async def send_success_to_chat(chat_id, multiplier, profit):
-    message = SUCCESS_TEMPLATE.format(
-        multiplier=multiplier,
-        profit=profit,
-        currency_symbol=CURRENCY_SYMBOL,
-        register_link=REGISTER_LINK
-    )
-    await bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', disable_web_page_preview=True)
-    logger.info(f"Success blast to {chat_id} with {multiplier}x")
+# === CORE ENGINE ===
 
 async def main():
-    logger.info("Dynamic Engine DEPLOYED: Hunting peak engagement for $2K+ daily.")
-    print("Profit missile active. Targeting 6x signals/day in high-engagement windows.")
-    
-    daily_signals = set()  # Track deployed per day (window_idx)
-    
+    logger.info("GLOBAL DYNAMIC ENGINE LIVE: Targeting $3,000+ daily across 5 continents.")
+    print("Worldwide profit missile active. 6x global signals/day.")
+
+    deployed_today = set()
+
     while True:
         try:
-            now = datetime.now(ZoneInfo(TIMEZONE))
-            today_str = now.date().isoformat()
-            
-            # Reset daily at midnight
-            if now.hour == 0 and now.minute == 0:
-                daily_signals.clear()
-            
-            deployed_today = len(daily_signals) >= len(PEAK_WINDOWS)
-            
-            for idx in range(len(PEAK_WINDOWS)):
-                if idx in daily_signals:
+            utc_now = datetime.now(pytz.UTC)
+            today_str = utc_now.date().isoformat()
+
+            if utc_now.hour == 0 and utc_now.minute < 5:
+                deployed_today.clear()
+
+            for idx, (hype_str, bet_str) in enumerate(GLOBAL_PEAK_WINDOWS_UTC):
+                if idx in deployed_today:
                     continue
-                
-                bet_time = get_bet_time_from_window(idx)
-                hype_time = bet_time - timedelta(minutes=20)
+
+                hype_time = datetime.strptime(f"{today_str} {hype_str}", "%Y-%m-%d %H:%M").replace(tzinfo=pytz.UTC)
+                bet_time = datetime.strptime(f"{today_str} {bet_str}", "%Y-%m-%d %H:%M").replace(tzinfo=pytz.UTC)
                 success_time = bet_time + timedelta(minutes=5)
-                
-                # Hype deployment (20 min before bet)
-                if abs((now - hype_time).total_seconds()) <= 60:
-                    online, deposits = await get_engagement_estimate()
-                    if online > 150:
-                        multiplier_preview = random_high_multiplier()
-                        logger.info(f"Deploying hype for window {idx}")
-                        await send_to_all_channels(
-                            lambda cid: send_hype_to_chat(cid, multiplier_preview, online, deposits)
-                        )
+
+                if utc_now > success_time:
+                    continue
+
+                # HYPE
+                if abs((utc_now - hype_time).total_seconds()) <= 60:
+                    online, deposits = await get_global_engagement()
+                    if online > 200:
+                        mult = random_high_multiplier()
+                        logger.info(f"Global Hype #{idx} @ {hype_time}")
+                        await send_to_all(lambda cid: bot.send_message(
+                            chat_id=cid,
+                            text=HYPE_TEMPLATE.format(
+                                multiplier_preview=mult,
+                                online_count=online,
+                                deposits_live=deposits,
+                                register_link=REGISTER_LINK
+                            ),
+                            parse_mode='Markdown',
+                            disable_web_page_preview=True
+                        ))
                         await asyncio.sleep(60)
-                    else:
-                        logger.info(f"Low engagement, skipping hype for {idx}")
-                
-                # Signal deployment (at bet time)
-                elif abs((now - bet_time).total_seconds()) <= 60:
-                    online, _ = await get_engagement_estimate()
-                    if online > 150 and idx not in daily_signals:
-                        multiplier = random_high_multiplier()
-                        logger.info(f"Deploying signal for window {idx}")
-                        await send_to_all_channels(lambda cid: send_signal_to_chat(cid, bet_time, multiplier))
-                        daily_signals.add(idx)
-                        # Store for success (simple: use last multiplier)
-                        last_multiplier = multiplier
+
+                # SIGNAL
+                elif abs((utc_now - bet_time).total_seconds()) <= 60:
+                    online, _ = await get_global_engagement()
+                    if online > 200 and idx not in deployed_today:
+                        mult = random_high_multiplier()
+                        last_mult = mult
+                        # Localize per group (simulate)
+                        async def send_local_signal(cid):
+                            tz = detect_user_timezone(cid)
+                            local_bet = get_local_time(bet_time, tz)
+                            curr = get_currency(tz)
+                            await bot.send_message(
+                                chat_id=cid,
+                                text=SIGNAL_TEMPLATE.format(
+                                    bet_time_local=local_bet.strftime("%I:%M %p"),
+                                    multiplier=mult,
+                                    currency_symbol=curr,
+                                    register_link=REGISTER_LINK
+                                ),
+                                parse_mode='Markdown',
+                                disable_web_page_preview=True
+                            )
+                        logger.info(f"Global Signal #{idx} @ {bet_time}")
+                        await send_to_all(send_local_signal)
+                        deployed_today.add(idx)
                         await asyncio.sleep(60)
-                    else:
-                        logger.info(f"Engagement check failed or already sent for {idx}")
-                
-                # Success blast (5 min after)
-                elif abs((now - success_time).total_seconds()) <= 60 and idx in daily_signals:
+
+                # SUCCESS
+                elif abs((utc_now - success_time).total_seconds()) <= 60 and idx in deployed_today:
                     profit = random_profit()
-                    logger.info(f"Blasting success for window {idx}")
-                    await send_to_all_channels(lambda cid: send_success_to_chat(cid, last_multiplier, profit))
-                    await asyncio.sleep(300)  # Cooldown after success
-            
-            if not deployed_today:
-                await asyncio.sleep(30)  # Frequent checks during day
-            else:
-                # Sleep to next day first window
-                next_day_first = datetime.combine(now.date() + timedelta(days=1), parse_time_str(PEAK_WINDOWS[0][1]), tzinfo=ZoneInfo(TIMEZONE))
-                sleep_sec = (next_day_first - now).total_seconds()
-                logger.info(f"All signals deployed. Sleeping {sleep_sec/3600:.1f} hrs to next cycle.")
-                await asyncio.sleep(sleep_sec)
-            
+                    async def send_local_success(cid):
+                        tz = detect_user_timezone(cid)
+                        curr = get_currency(tz)
+                        await bot.send_message(
+                            chat_id=cid,
+                            text=SUCCESS_TEMPLATE.format(
+                                multiplier=last_mult,
+                                profit=profit,
+                                currency_symbol=curr,
+                                register_link=REGISTER_LINK
+                            ),
+                            parse_mode='Markdown',
+                            disable_web_page_preview=True
+                        )
+                    logger.info(f"Global Success #{idx}")
+                    await send_to_all(send_local_success)
+                    await asyncio.sleep(300)
+
+            await asyncio.sleep(30 if len(deployed_today) < 6 else 3600)
+
         except Exception as e:
-            logger.error(f"Engine error: {e}")
+            logger.error(f"Global engine error: {e}")
             await asyncio.sleep(60)
 
 @app.route('/health')
 def health_check():
-    return jsonify({"status": "dynamic", "target": "$2K+ daily conversions"})
+    return jsonify({
+        "status": "GLOBAL DOMINATION",
+        "target": "$3,000+ daily",
+        "coverage": "India • Russia • Turkey • Brazil • Africa • SEA"
+    })
 
 def run_bot():
     asyncio.run(main())
