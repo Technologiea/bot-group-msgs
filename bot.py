@@ -174,7 +174,7 @@ async def main():
                 if not bt:
                     continue
 
-                ht = bt - timedelta(minutes=20)  # hype 20 mins before
+                ht = bt - timedelta(minutes=10)  # hype 10 mins before
                 st = bt + timedelta(minutes=5)   # success 5 mins after
 
                 # HYPE
