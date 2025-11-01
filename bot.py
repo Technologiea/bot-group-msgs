@@ -8,7 +8,7 @@ import asyncio
 import random
 import logging
 import os
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from telegram import Bot, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.error import TelegramError
@@ -21,6 +21,7 @@ import threading
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 GROUP_CHAT_IDS = os.getenv('GROUP_CHAT_IDS', '').split(',')
 REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://lkpq.cc/eec3')
+APP_DOWNLOAD_LINK = os.getenv('APP_DOWNLOAD_LINK', 'https://drive.google.com/uc?export=download&id=1RDyUaS8JT8RRsMpfTn9Dk7drdiK3MyCW')
 TIMEZONE = os.getenv('TIMEZONE', 'Asia/Kolkata')
 CURRENCY_SYMBOL = os.getenv('CURRENCY_SYMBOL', '₹')
 PORT = int(os.getenv('PORT', 5000))
@@ -62,13 +63,14 @@ DEPOSIT_KEYBOARD = InlineKeyboardMarkup([
 ])
 
 # ============================================================
-# MESSAGE TEMPLATES
+# MESSAGE TEMPLATES (With App Download Link)
 # ============================================================
 HYPE_TEMPLATE = (
     "🚨 LUCKY JET ALERT 🚨\n\n"
     "Big move coming in 20 mins!\n"
     "Be ready to register & deposit now.\n\n"
-    "✅ Claim 500% bonus → {register_link}\n\n"
+    "✅ Claim 500% bonus → {register_link}\n"
+    "📲 Download the 1Win App → {app_link}\n\n"
     "(Only for 18+ players. Play responsibly.)"
 )
 
@@ -77,7 +79,8 @@ SIGNAL_TEMPLATE = (
     "Bet: Enter NOW\n"
     "Cashout target: {multiplier}x\n\n"
     "Deposit ₹100 → Play ₹600\n"
-    "Claim bonus & deposit: {register_link}\n\n"
+    "✅ Claim bonus & deposit: {register_link}\n"
+    "📲 Download the 1Win App → {app_link}\n\n"
     "Reply “DONE” after you deposit to get help."
 )
 
@@ -86,7 +89,8 @@ SUCCESS_TEMPLATE = (
     "Result: +{multiplier}x\n"
     "Group profit: {currency_symbol}{profit:,}\n\n"
     "Missed this? Next in ~45 mins.\n"
-    "Claim bonus & join: {register_link}"
+    "✅ Claim bonus & join: {register_link}\n"
+    "📲 Download the 1Win App → {app_link}"
 )
 
 # ============================================================
@@ -140,16 +144,16 @@ async def send_all(func):
 # ============================================================
 # MESSAGE SENDERS
 # ============================================================
-async def send_hype(cid, register_link):
-    msg = HYPE_TEMPLATE.format(register_link=register_link)
+async def send_hype(cid, register_link, app_link):
+    msg = HYPE_TEMPLATE.format(register_link=register_link, app_link=app_link)
     await bot.send_message(cid, msg, disable_web_page_preview=True, reply_markup=DEPOSIT_KEYBOARD)
 
-async def send_signal(cid, m, register_link):
-    msg = SIGNAL_TEMPLATE.format(multiplier=m, register_link=register_link)
+async def send_signal(cid, m, register_link, app_link):
+    msg = SIGNAL_TEMPLATE.format(multiplier=m, register_link=register_link, app_link=app_link)
     await bot.send_message(cid, msg, disable_web_page_preview=True, reply_markup=DEPOSIT_KEYBOARD)
 
-async def send_success(cid, m, p, currency_symbol, register_link):
-    msg = SUCCESS_TEMPLATE.format(multiplier=m, profit=p, currency_symbol=currency_symbol, register_link=register_link)
+async def send_success(cid, m, p, currency_symbol, register_link, app_link):
+    msg = SUCCESS_TEMPLATE.format(multiplier=m, profit=p, currency_symbol=currency_symbol, register_link=register_link, app_link=app_link)
     await bot.send_message(cid, msg, disable_web_page_preview=True, reply_markup=DEPOSIT_KEYBOARD)
 
 # ============================================================
@@ -183,7 +187,7 @@ async def main():
                     for cid in GROUP_CHAT_IDS:
                         oc, dl = await get_real_engagement(cid.strip())
                         if oc >= ENGAGEMENT_THRESHOLD:
-                            tasks.append(send_hype(cid.strip(), REGISTER_LINK))
+                            tasks.append(send_hype(cid.strip(), REGISTER_LINK, APP_DOWNLOAD_LINK))
                     if tasks:
                         await asyncio.gather(*tasks, return_exceptions=True)
                         logger.info("🔥 Hype message sent.")
@@ -196,7 +200,7 @@ async def main():
                         oc, _ = await get_real_engagement(cid.strip())
                         if oc >= ENGAGEMENT_THRESHOLD:
                             m = random_multiplier()
-                            tasks.append(send_signal(cid.strip(), m, REGISTER_LINK))
+                            tasks.append(send_signal(cid.strip(), m, REGISTER_LINK, APP_DOWNLOAD_LINK))
                     if tasks:
                         await asyncio.gather(*tasks, return_exceptions=True)
                         daily_done.add(i)
@@ -209,7 +213,7 @@ async def main():
                     tasks = []
                     for cid in GROUP_CHAT_IDS:
                         p = random_profit()
-                        tasks.append(send_success(cid.strip(), last_mult, p, CURRENCY_SYMBOL, REGISTER_LINK))
+                        tasks.append(send_success(cid.strip(), last_mult, p, CURRENCY_SYMBOL, REGISTER_LINK, APP_DOWNLOAD_LINK))
                     if tasks:
                         await asyncio.gather(*tasks, return_exceptions=True)
                         logger.info("🏆 Success message sent.")
@@ -232,7 +236,7 @@ def health():
         "target": "₹2,00,000/day",
         "timezone": TIMEZONE,
         "threshold": ENGAGEMENT_THRESHOLD,
-        "features": ["Clean Templates", "Emoji Friendly", "Indian Time Sync", "No External API"]
+        "features": ["Clean Templates", "App Download Link", "Emoji Friendly", "Indian Time Sync", "No External API"]
     })
 
 def run_bot():
