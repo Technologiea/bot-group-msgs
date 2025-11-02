@@ -12,7 +12,8 @@ import threading
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from flask import Flask, jsonify
-from telegram import Bot, InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
+from telegram import Bot, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.constants import ParseMode
 from telegram.error import TelegramError
 
 # ============================================================
