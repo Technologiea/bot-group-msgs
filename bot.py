@@ -23,7 +23,7 @@ GROUP_CHAT_IDS = os.getenv('GROUP_CHAT_IDS', '').split(',')
 REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://lkpq.cc/eec3')
 APP_DOWNLOAD_LINK = os.getenv(
     'APP_DOWNLOAD_LINK',
-    'https://drive.google.com/file/d/1RDyUaS8JT8RRsMpfTn9Dk7drdiK3MyCW/view?usp=sharing'
+    'https://drive.google.com/file/d/1VCBQtawa4YgnSxYkqCjzU4IiwnMWH6Mx/view?usp=sharing'
 )
 TIMEZONE = os.getenv('TIMEZONE', 'Asia/Kolkata')
 CURRENCY_SYMBOL = os.getenv('CURRENCY_SYMBOL', '₹')
