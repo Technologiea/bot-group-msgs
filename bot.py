@@ -8,7 +8,6 @@ from telegram import Bot, InlineKeyboardMarkup, InlineKeyboardButton, Poll
 from telegram.error import TelegramError
 from flask import Flask, jsonify
 import threading
-import pytz
 
 # ============================================================
 # CONFIGURATION
