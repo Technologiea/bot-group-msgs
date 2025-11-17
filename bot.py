@@ -14,7 +14,7 @@ import threading
 # ============================================================
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 GROUP_CHAT_IDS = [x.strip() for x in os.getenv('GROUP_CHAT_IDS', '').split(',') if x.strip()]
-REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://lkpq.cc/eec3')  # Direct web reg
+REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://lkpq.cc/27b4d101')  # Direct web reg
 TIMEZONE = os.getenv('TIMEZONE', 'Asia/Kolkata')
 CURRENCY_SYMBOL = os.getenv('CURRENCY_SYMBOL', '₹')
 PORT = int(os.getenv('PORT', 5000))
