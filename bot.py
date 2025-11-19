@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from telegram import Bot, Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, ContextTypes, ChatMemberHandler
+from telegram.ext import Application, ContextTypes, ChatMemberHandler  # v21: No separate ApplicationBuilder
 from telegram.constants import ChatMemberStatus
 from telegram.error import Forbidden, TelegramError
 
@@ -153,7 +153,7 @@ Game: <b>Lucky Jet</b>
 Bet in next 60 seconds
 Target: <b>{multiplier}x</b>
 
-<b>ENTRY NOW!</b> Don’t miss this one!
+<b>ENTRY NOW!</b> Don't miss this one!
 """
     msg = await bot.send_message(
         chat_id=chat_id,
@@ -236,16 +236,20 @@ def health():
     })
 
 # ============================================================
-# MAIN START
+# MAIN START (v21 compatible)
 # ============================================================
 async def main():
+    # v21: Use Application.builder() directly
     application = Application.builder().token(BOT_TOKEN).build()
 
     # Add the welcome handler
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
 
-    # Start beast mode in background
-    application.job_queue.run_repeating(lambda c: asyncio.create_task(beast_loop()), interval=1, first=1)
+    # Start beast mode in background (use job_queue for repeating task)
+    async def run_beast():
+        await beast_loop()
+
+    application.job_queue.run_repeating(run_beast, interval=60, first=10)  # Run every 60s, start after 10s
 
     logger.info("1WIN LUCKY JET BEAST 2025 STARTED | Welcome DM + Signals ACTIVE")
     await application.run_polling(drop_pending_updates=True)
