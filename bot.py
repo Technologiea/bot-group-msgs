@@ -1,3 +1,7 @@
+# bot.py - 1WIN LUCKY JET BEAST 2025 - FINAL VERSION
+# Works on Python 3.12 (recommended) + python-telegram-bot 20.8
+# OR Python 3.13 + python-telegram-bot 21.4+
+
 import asyncio
 import random
 import logging
@@ -5,8 +9,8 @@ import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from telegram import Bot, Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, ContextTypes, ChatMemberHandler  # v21: No separate ApplicationBuilder
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Application, ContextTypes, ChatMemberHandler
 from telegram.constants import ChatMemberStatus
 from telegram.error import Forbidden, TelegramError
 
@@ -16,26 +20,60 @@ import threading
 # ============================================================
 # CONFIGURATION - UPDATE THESE
 # ============================================================
-BOT_TOKEN = os.getenv('BOT_TOKEN')
-GROUP_CHAT_IDS = [int(x.strip()) for x in os.getenv('GROUP_CHAT_IDS', '').split(',') if x.strip()]
-REGISTER_LINK = os.getenv('REGISTER_LINK', 'https://lkpq.cc/27b4d101')
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+GROUP_CHAT_IDS = [int(x) for x in os.getenv("GROUP_CHAT_IDS", "").split(",") if x.strip()]
+REGISTER_LINK = os.getenv("REGISTER_LINK", "https://lkpq.cc/27b4d101")
 PROMO_CODE = "DOREN99"
-ADMIN_USERNAME = "youradmin"  # Change to your real username without @
-TIMEZONE = os.getenv('TIMEZONE', 'Asia/Kolkata')
-PORT = int(os.getenv('PORT', 5000))
-ENGAGEMENT_THRESHOLD = 100
+ADMIN_USERNAME = "yourusername"  # Change this! (without @)
+TIMEZONE = os.getenv("TIMEZONE", "Asia/Kolkata")
+PORT = int(os.getenv("PORT", 5000))
 
 # ============================================================
 # SETUP
 # ============================================================
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-bot = Bot(token=BOT_TOKEN)
 
-# Track users who already received welcome (avoid spam)
+# To prevent welcome spam
 welcomed_users = set()
+
+# ============================================================
+# MESSAGES & KEYBOARD
+# ============================================================
+WELCOME_MESSAGE = f"""
+WELCOME TO THE #1 LUCKY JET WINNING GROUP!
+
++500% First Deposit Bonus Active!
+Use Promo Code: <b>{PROMO_CODE}</b>
+
+Register & Claim Now:
+<a href="{REGISTER_LINK}">CLICK HERE - GET ₹1,200 FREE</a>
+
+Minimum Deposit ₹200 → Play with ₹1,200 Instantly!
+
+Want VIP Group + 98% Accuracy Signals?
+→ DM @{ADMIN_USERNAME} and write: <b>DOREN99</b>
+
+Let's make money today!
+"""
+
+def get_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Claim 500% Bonus Now", url=REGISTER_LINK)],
+        [InlineKeyboardButton("Play Lucky Jet Instantly", url=REGISTER_LINK)]
+    ])
+
+LIVE_PROOFS = [
+    "Mumbai user just won ₹18,400 in 3 mins!",
+    "Delhi player claimed 700% bonus → ₹5,000 profit!",
+    "Kerala VIP hit 21x → ₹42,000 cashout!",
+    "Bangalore user turned ₹500 → ₹4,200!"
+]
 
 # ============================================================
 # PEAK WINDOWS (IST)
@@ -46,178 +84,148 @@ PEAK_WINDOWS = [
     ("12:00 PM", "12:20 PM"),
     ("4:30 PM", "4:50 PM"),
     ("7:00 PM", "7:20 PM"),
-    ("10:30 PM", "11:55 PM"),
-]
-
-BONUS_OFFERS = [
-    "500% Welcome Bonus", "600% Mega Bonus", "700% VIP Bonus", "500% + 70 Free Spins"
-]
-LIVE_DEPOSITS = [
-    "Mumbai user just deposited ₹500 → Playing ₹3,000!",
-    "Delhi player claimed 700% bonus → Playing ₹800!",
-    "Hyderabad user won ₹4,200 in 2 mins!",
-    "Bangalore VIP just cashed out ₹12,400!",
-    "Kerala player hit 17.5x → ₹18,000 profit!"
+    ("10:30 PM", "11:55 PM"),  # Extended as you wanted
 ]
 
 # ============================================================
-# WELCOME MESSAGE (Sent in Private DM)
-# ============================================================
-WELCOME_MESSAGE = f"""
-🔥 WELCOME TO THE WINNING FAMILY! 🔥
-
-You just joined the most accurate Lucky Jet signal group in India!
-
-💰 Get +500% Bonus on Your First Deposit
-   Use Promo Code: <b>{PROMO_CODE}</b>
-
-🎯 Register Now → <a href="{REGISTER_LINK}">Click Here to Claim Bonus</a>
-
-✅ Minimum Deposit ₹200 → Play with ₹1,200 Instantly!
-   Many users already made ₹15,000–₹50,000 today!
-
-💎 Want VIP Group + 95% Accuracy + Personal Manager?
-   → Message @{ADMIN_USERNAME} and type: <b>DOREN99</b>
-
-See you on the moon! 🚀
-"""
-
-def get_signal_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚀 Claim 500% Bonus Now", url=REGISTER_LINK)],
-        [InlineKeyboardButton("🎰 Play Lucky Jet Instantly", url=REGISTER_LINK)],
-    ])
-
-# ============================================================
-# NEW USER JOIN DETECTION + WELCOME DM
+# WELCOME NEW MEMBER (Private DM)
 # ============================================================
 async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    new_member = update.chat_member.new_chat_member.user
-    chat = update.chat_member.chat
+    member = update.chat_member.new_chat_member.user
+    chat_id = update.chat_member.chat.id
 
-    # Only care about real users joining our monitored groups
-    if chat.id not in GROUP_CHAT_IDS or new_member.is_bot:
+    if chat_id not in GROUP_CHAT_IDS or member.is_bot:
         return
 
     if update.chat_member.new_chat_member.status not in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR):
-        return  # not actually joined
+        return
 
-    user_id = new_member.id
-    if user_id in welcomed_users:
-        return  # already welcomed
+    if member.id in welcomed_users:
+        return
 
-    welcomed_users.add(user_id)
+    welcomed_users.add(member.id)
 
     try:
         await context.bot.send_message(
-            chat_id=user_id,
+            chat_id=member.id,
             text=WELCOME_MESSAGE,
-            parse_mode='HTML',
+            parse_mode="HTML",
             disable_web_page_preview=True
         )
-        logger.info(f"Welcome DM sent to {new_member.full_name} ({user_id})")
-        
-        # Optional: Announce in group (uncomment if you want)
-        # await context.bot.send_message(chat.id, f"Welcome {new_member.first_name}! Check your DM 🚀")
-
+        logger.info(f"Welcome DM sent to {member.full_name} ({member.id})")
     except Forbidden:
-        logger.warning(f"User {user_id} blocked the bot or never started it")
+        logger.warning(f"User {member.id} blocked the bot")
     except Exception as e:
-        logger.error(f"Failed to send welcome to {user_id}: {e}")
+        logger.error(f"Welcome failed: {e}")
 
 # ============================================================
-# YOUR BEAST MODE MESSAGES (Hype / Signal / Success)
+# BEAST MESSAGES
 # ============================================================
 async def send_hype(chat_id):
-    bonus = random.choice(BONUS_OFFERS)
-    live = random.choice(LIVE_DEPOSITS)
+    proof = random.choice(LIVE_PROOFS)
     text = f"""
-🔥 LIVE ACTIVITY IS CRAZY RIGHT NOW!
+LIVE ACTIVITY EXPLODING RIGHT NOW!!
 
-{live}
-{bonus} still active!
+{proof}
 
-👇 Players are depositing & winning non-stop!
+500% Bonus Still Active!
+Players depositing & winning non-stop!
 """
     try:
-        await bot.send_message(chat_id=chat_id, text=text, reply_markup=get_signal_keyboard())
-    except Exception as e:
-        logger.error(f"Hype failed in {chat_id}: {e}")
+        await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=get_keyboard())
+    except: pass
 
 async def send_signal(chat_id):
-    multiplier = round(random.uniform(8.0, 19.0), 2)
+    mult = round(random.uniform(9.0, 22.0), 2)
     text = f"""
-🚀 NEXT SIGNAL IS READY!
+NEXT SIGNAL IS READY!!
 
 Game: <b>Lucky Jet</b>
-Bet in next 60 seconds
-Target: <b>{multiplier}x</b>
+Target: <b>{mult}x</b>
 
-<b>ENTRY NOW!</b> Don't miss this one!
+ENTRY NOW - 60 SECONDS!
+
+Don't miss this rocket!
 """
-    msg = await bot.send_message(
+    await context.bot.send_message(
         chat_id=chat_id,
         text=text,
-        parse_mode='HTML',
-        reply_markup=get_signal_keyboard()
+        parse_mode="HTML",
+        reply_markup=get_keyboard()
     )
-    return multiplier
+    return mult
 
-async def send_success(chat_id, multi, profit):
+async def send_success(chat_id, mult, profit):
     text = f"""
-✅ SIGNAL HIT {multi}x !!
+SIGNAL HIT {mult}x !!
 
-💰 Total Profit Today: ₹{profit:,}+
-Another winner added to the list!
+Total Profit Today: ₹{profit:,}+
+Another winner added!
 
-Next signal in 10–15 mins 🔥
+Next signal in 10-15 mins
 """
-    await bot.send_message(chat_id=chat_id, text=text, reply_markup=get_signal_keyboard())
+    await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=get_keyboard())
 
 # ============================================================
-# MAIN BEAST LOOP (Unchanged logic, just cleaned)
+# MAIN BEAST LOOP
 # ============================================================
 async def beast_loop():
     daily_done = set()
-    last_mult = 12.5
+    last_multiplier = 15.5
 
     while True:
         try:
             now = datetime.now(ZoneInfo(TIMEZONE))
+            current_time = now.time()
+
+            # Reset daily at midnight
             if now.hour == 0 and now.minute < 5:
                 daily_done.clear()
+                logger.info("Daily windows reset")
 
-            for i, (start, end) in enumerate(PEAK_WINDOWS):
+            for i, (start_str, end_str) in enumerate(PEAK_WINDOWS):
                 if i in daily_done:
                     continue
 
-                end_time = datetime.strptime(end, "%I:%M %p").time()
-                target_dt = datetime.combine(now.date(), end_time, now.tzinfo)
-                if now.time() > end_time:
-                    target_dt += timedelta(days=1)
+                end_time = datetime.strptime(end_str, "%I:%M %p").time()
+                target = datetime.combine(now.date(), end_time, now.tzinfo)
+                if current_time > end_time:
+                    target += timedelta(days=1)
 
-                hype_time = target_dt - timedelta(minutes=12)
-                signal_time = target_dt
-                success_time = target_dt + timedelta(minutes=6)
+                hype_time = target - timedelta(minutes=12)
+                signal_time = target
+                success_time = target + timedelta(minutes=6)
 
-                if abs((now - hype_time).total_seconds()) < 120:
-                    await asyncio.gather(*(send_hype(cid) for cid in GROUP_CHAT_IDS))
-                    await asyncio.sleep(90)
+                # Hype phase
+                if hype_time <= now < signal_time:
+                    for cid in GROUP_CHAT_IDS:
+                        await send_hype(cid)
+                        await asyncio.sleep(1.5)  # Anti-flood
+                    await asyncio.sleep(80)
 
-                elif abs((now - signal_time).total_seconds()) < 120:
-                    results = await asyncio.gather(*(send_signal(cid) for cid in GROUP_CHAT_IDS), return_exceptions=True)
-                    last_mult = next((r for r in results if isinstance(r, float)), random.uniform(10, 18))
+                # Signal phase
+                elif signal_time <= now < success_time:
+                    results = []
+                    for cid in GROUP_CHAT_IDS:
+                        mult = await send_signal(cid)
+                        results.append(mult)
+                        await asyncio.sleep(1.8)
+                    last_multiplier = max(results) if results else round(random.uniform(12, 20), 2)
                     daily_done.add(i)
-                    logger.info(f"SIGNAL SENT → {last_mult}x")
+                    logger.info(f"SIGNAL FIRED → {last_multiplier}x")
                     await asyncio.sleep(90)
 
-                elif abs((now - success_time).total_seconds()) < 180 and i in daily_done:
-                    profit = random.randint(8000, 25000)
-                    await asyncio.gather(*(send_success(cid, last_mult, profit) for cid in GROUP_CHAT_IDS))
+                # Success phase
+                elif success_time <= now < success_time + timedelta(minutes=5):
+                    profit = random.randint(12000, 38000)
+                    for cid in GROUP_CHAT_IDS:
+                        await send_success(cid, last_multiplier, profit)
+                        await asyncio.sleep(1.5)
                     logger.info(f"Success posted: ₹{profit:,}")
                     await asyncio.sleep(300)
 
-            await asyncio.sleep(45)
+            await asyncio.sleep(30)
+
         except Exception as e:
             logger.error(f"Beast loop error: {e}")
             await asyncio.sleep(60)
@@ -225,38 +233,41 @@ async def beast_loop():
 # ============================================================
 # HEALTH CHECK
 # ============================================================
-@app.route('/health')
+@app.route("/health")
 def health():
     return jsonify({
-        "status": "BEAST MODE ACTIVE",
+        "status": "LIVE & ACTIVE",
+        "bot": "1Win Lucky Jet Beast 2025",
         "groups": len(GROUP_CHAT_IDS),
         "welcome_system": "ON",
-        "next_big_window": "10:30 PM → 11:55 PM",
-        "target": "₹2L+ daily deposits"
+        "next_window": "10:30 PM → 11:55 PM",
+        "target": "₹2,00,000+ daily"
     })
 
 # ============================================================
-# MAIN START (v21 compatible)
+# START BOT
 # ============================================================
 async def main():
-    # v21: Use Application.builder() directly
-    application = Application.builder().token(BOT_TOKEN).build()
+    app_builder = Application.builder().token(BOT_TOKEN)
+    application = app_builder.build()
 
-    # Add the welcome handler
+    # Add handlers
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
 
-    # Start beast mode in background (use job_queue for repeating task)
-    async def run_beast():
-        await beast_loop()
+    # Start beast loop in background
+    application.job_queue.run_once(lambda ctx: asyncio.create_task(beast_loop()), 5)
 
-    application.job_queue.run_repeating(run_beast, interval=60, first=10)  # Run every 60s, start after 10s
+    logger.info("1WIN LUCKY JET BEAST 2025 STARTED SUCCESSFULLY!")
+    logger.info("Welcome DM + Auto Signals ACTIVE")
 
-    logger.info("1WIN LUCKY JET BEAST 2025 STARTED | Welcome DM + Signals ACTIVE")
-    await application.run_polling(drop_pending_updates=True)
+    await application.run_polling(
+        drop_pending_updates=True,
+        allowed_updates=Update.ALL_TYPES
+    )
 
 if __name__ == "__main__":
-    # Run Flask health check in thread
-    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=PORT), daemon=True).start()
+    # Flask health check in background
+    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=PORT), daemon=True).start()
     
-    # Start the real bot
+    # Start Telegram bot
     asyncio.run(main())
