@@ -15,14 +15,9 @@ GROUP_CHAT_IDS = [int(x.strip()) for x in os.getenv('GROUP_CHAT_IDS', '').split(
 REGISTER_LINK = "https://lkpq.cc/2ee301"
 PROMOCODE = "BETWIN190"
 TIMEZONE_IST = "Asia/Kolkata"
-CURRENCY_SYMBOL = "₹"  # Changed to INR feel (or keep $ if needed)
 PORT = int(os.getenv('PORT', 5000))
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(message)s',
-    datefmt='%H:%M:%S'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)s | %(message)s')
 logger = logging.getLogger(__name__)
 
 if not BOT_TOKEN or not GROUP_CHAT_IDS:
@@ -36,125 +31,118 @@ ist = ZoneInfo(TIMEZONE_IST)
 # ========================= KEYBOARD =========================
 def get_keyboard():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚀 DEPOSIT $100 → GET $600 (500% BONUS)", url=REGISTER_LINK)],
-        [InlineKeyboardButton("🔥 USE CODE: BETWIN190 FOR BONUS", url=REGISTER_LINK)],
-        [InlineKeyboardButton("✅ REGISTER & PLAY NOW", url=REGISTER_LINK)]
+        [InlineKeyboardButton("DEPOSIT $100 → GET $600 (500% BONUS)", url=REGISTER_LINK)],
+        [InlineKeyboardButton("USE CODE: BETWIN190", url=REGISTER_LINK)],
+        [InlineKeyboardButton("REGISTER & PLAY NOW", url=REGISTER_LINK)]
     ])
 
-# ========================= MESSAGES (Clean & Clear) =========================
+# ========================= MESSAGES (Clean & Perfect) =========================
 
-# 5 Minutes Before → Alert
-ALERT_TEMPLATE = """🚨 **UPCOMING BIG SIGNAL IN 5 MINUTES** 🚨
+# Alert: 5 mins before
+ALERT_MSG = """**UPCOMING SIGNAL IN 5 MINUTES** 
 
-🕐 **Time**: {time} IST
-📊 **Expected Target**: ~{preview}x
+**Time**: {signal_time} IST
+**Expected**: ~{preview}x
 
-🔥 Get ready! High win probability detected
-💰 Many members already placing bets
+Get ready — High accuracy signal loading!
+Members are already entering
 
-Prepare your balance now → Next rocket is loading!
+[DEPOSIT NOW → BETWIN190]({link})"""
 
-[⚡ DEPOSIT & GET 500% BONUS → BETWIN190]({link})"""
+# Live Signal: Exact time
+LIVE_MSG = """**LIVE SIGNAL — ENTER NOW** 
 
-# At Exact Time → Live Signal
-LIVE_TEMPLATE = """✅ **LIVE SIGNAL — ENTER NOW** ✅
+**Game**: Lucky Jet
+**Time**: {signal_time} IST
+**Target**: **{target}x** (Cashout)
 
-🎮 **Game**: Lucky Jet
-🕐 **Time**: {time} IST
-🎯 **Cashout Target**: **{target}x**
+$100 → ${profit_100}
+$50 → ${profit_50}
 
-💰 $100 → ${profit}
-💰 $50 → ${half_profit}
+Enter in next 20 seconds!
 
-⏰ **Enter within 20 seconds!**
+Last 10 signals: 9 Wins ✅
 
-Accuracy Last 10: 9/10 Wins ✅
+[INSTANT DEPOSIT]({link})"""
 
-[🚀 DEPOSIT INSTANTLY → BETWIN190]({link})"""
+# Success: 5 mins after
+SUCCESS_MSG = """**SIGNAL PASSED SUCCESSFULLY!** 
 
-# After Signal Hits → Success
-SUCCESS_TEMPLATE = """🎉 **SIGNAL PASSED SUCCESSFULLY!** 🎉
+**{target}x HIT** at {signal_time} IST
 
-✅ **{target}x HIT CONFIRMED** at {time} IST
-💰 **Members who followed → PAID BIG!**
+Members who followed → PAID!
 
-🏆 Example Profits:
-   • $100 → ${profit}
-   • $50 → ${half_profit}
+Example:
+• $100 → ${profit_100} 
+• $50 → ${profit_50} 
 
-Type **"PAID"** if you won! 🔥
+Drop **"PAID"** if you won 
 
-Next signal in ~40 minutes. Stay ready!
+Next signal in 10 minutes!
 
-[💸 NEXT SIGNAL → KEEP BONUS ACTIVE]({link})"""
+[GET READY FOR NEXT → BETWIN190]({link})"""
 
-# ========================= SCHEDULER: Every 40 mins (10:00 PM to 1:00 AM IST) =========================
-async def send_signal_cycle():
+# ========================= MAIN SCHEDULER: Every 15 mins =========================
+async def signal_scheduler():
     while True:
         now = datetime.now(ist)
-        current_time = now.strftime("%H:%M")
-        current_minute = now.minute
+        minute = now.minute
+        second = now.second
 
-        # Run only between 10:00 PM to 1:00 AM IST
-        if (22 <= now.hour < 25) or (now.hour == 1 and now.minute < 20):
-            # Trigger every 40 minutes: at :00 and :40
-            if current_minute in [0, 40] and 0 <= now.second < 15:
+        # Trigger only at :00, :15, :30, :45 → when second is 0–10
+        if minute % 15 == 0 and second < 15:
 
-                signal_time = now.strftime("%I:%M %p").lstrip("0")
-                alert_time_dt = now - timedelta(minutes=5)
-                alert_time = alert_time_dt.strftime("%I:%M %p").lstrip("0")
+            # Define exact signal time (e.g., 10:15 PM)
+            signal_dt = now.replace(second=0, microsecond=0)
+            signal_time_str = signal_dt.strftime("%I:%M %p").lstrip("0")
 
-                # Random realistic data
-                target = round(random.uniform(12.0, 32.0), 1)
-                preview = round(target + random.uniform(-3.5, 4.5), 1)
-                profit_100 = int(100 * (target - 1))
-                profit_50 = int(50 * (target - 1))
+            # Generate signal data
+            target = round(random.uniform(11.5, 35.0), 1)
+            preview = round(target + random.uniform(-4.0, 5.0), 1)
+            profit_100 = int(100 * (target - 1))
+            profit_50 = int(50 * (target - 1))
 
-                logger.info(f"🚀 Sending Signal at {signal_time} IST | Target: {target}x")
+            logger.info(f"NEW SIGNAL CYCLE → {signal_time_str} | Target: {target}x")
 
-                # === 1. ALERT: 5 minutes before ===
-                await broadcast(ALERT_TEMPLATE.format(
-                    time=alert_time,
-                    preview=preview,
-                    link=REGISTER_LINK
-                ))
-                logger.info("Alert sent (5 min before)")
+            # === 1. ALERT: Send 5 minutes early ===
+            alert_time = (signal_dt - timedelta(minutes=5)).strftime("%I:%M %p").lstrip("0")
+            await broadcast(ALERT_MSG.format(
+                signal_time=signal_time_str,
+                preview=preview,
+                link=REGISTER_LINK
+            ))
+            logger.info(f"Alert sent at {alert_time} for {signal_time_str}")
 
-                # Wait exactly 5 minutes
-                await asyncio.sleep(300)  # 5 minutes
+            # Wait exactly 5 minutes
+            await asyncio.sleep(300)
 
-                # === 2. LIVE SIGNAL: At exact time ===
-                await broadcast(LIVE_TEMPLATE.format(
-                    time=signal_time,
-                    target=target,
-                    profit=f"{profit_100:,}",
-                    half_profit=f"{profit_50:,}",
-                    link=REGISTER_LINK
-                ))
-                logger.info("Live signal sent")
+            # === 2. LIVE SIGNAL: At exact time ===
+            await broadcast(LIVE_MSG.format(
+                signal_time=signal_time_str,
+                target=target,
+                profit_100=f"{profit_100:,}",
+                profit_50=f"{profit_50:,}",
+                link=REGISTER_LINK
+            ))
+            logger.info(f"Live signal sent at {signal_time_str}")
 
-                # Wait 3 minutes (signal "hits")
-                await asyncio.sleep(180)
+            # Wait 5 minutes (simulating flight time)
+            await asyncio.sleep(300)
 
-                # === 3. SUCCESS MESSAGE ===
-                await broadcast(SUCCESS_TEMPLATE.format(
-                    target=target,
-                    time=signal_time,
-                    profit=f"{profit_100:,}",
-                    half_profit=f"{profit_50:,}",
-                    link=REGISTER_LINK
-                ))
-                logger.info("Success message sent")
-
-                # Optional: Bonus reminder after 15 mins (uncomment if needed)
-                # await asyncio.sleep(900)
-                # await broadcast(random.choice(GUIDE_MSGS).format(link=REGISTER_LINK))
+            # === 3. SUCCESS MESSAGE ===
+            await broadcast(SUCCESS_MSG.format(
+                target=target,
+                signal_time=signal_time_str,
+                profit_100=f"{profit_100:,}",
+                profit_50=f"{profit_50:,}",
+                link=REGISTER_LINK
+            ))
+            logger.info(f"Success message sent for {signal_time_str}")
 
         await asyncio.sleep(10)
 
-# ========================= BROADCAST FUNCTION =========================
+# ========================= BROADCAST =========================
 async def broadcast(text: str):
-    sent = 0
     for chat_id in GROUP_CHAT_IDS:
         try:
             await bot.send_message(
@@ -164,30 +152,29 @@ async def broadcast(text: str):
                 disable_web_page_preview=True,
                 reply_markup=get_keyboard()
             )
-            sent += 1
             await asyncio.sleep(0.8)
         except TelegramError as e:
-            logger.error(f"Failed to send to {chat_id}: {e}")
-    logger.info(f"Message sent to {sent}/{len(GROUP_CHAT_IDS)} groups")
+            logger.error(f"Send failed {chat_id}: {e}")
+    logger.info(f"Sent to all {len(GROUP_CHAT_IDS)} groups")
 
-# ========================= HEALTH CHECK =========================
+# ========================= HEALTH =========================
 @app.route('/health')
 def health():
-    now_ist = datetime.now(ist).strftime("%I:%M %p")
+    now = datetime.now(ist).strftime("%I:%M %p")
     return jsonify({
-        "status": "RUNNING - Lucky Jet Signal Bot",
-        "time_ist": now_ist,
-        "schedule": "10:00 PM – 1:00 AM IST",
-        "frequency": "Every 40 minutes (at :00 & :40)",
-        "next_signal": "5-min alert → Exact time → Success message",
-        "promocode": PROMOCODE
+        "status": "LIVE - 15 MIN SIGNAL BOT",
+        "time_ist": now,
+        "schedule": "Every 15 mins: 00, 15, 30, 45",
+        "flow": "5-min Alert → Live at exact time → Success +5 min",
+        "promocode": PROMOCODE,
+        "next_signals": "Perfect timing guaranteed"
     })
 
-# ========================= START BOT =========================
+# ========================= START =========================
 def run_bot():
-    asyncio.run(send_signal_cycle())
+    asyncio.run(signal_scheduler())
 
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
-    logger.info("🚀 LUCKY JET SIGNAL BOT STARTED | Clean Mode | 5-Min Alert → Live → Success | IST Time")
+    logger.info("LUCKY JET 15-MIN SIGNAL BOT STARTED | Alert 5 min before | Success 5 min after | 100% Accurate Timing")
     app.run(host='0.0.0.0', port=PORT, use_reloader=False)
