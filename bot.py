@@ -17,6 +17,10 @@ PROMOCODE = "BETWIN190"
 TIMEZONE_IST = "Asia/Kolkata"
 PORT = int(os.getenv('PORT', 5000))
 
+# Daily operation hours (22:00 to 01:00 IST)
+ACTIVE_HOURS_START = 22  # 10 PM
+ACTIVE_HOURS_END = 1     # 1 AM (next day)
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)s | %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -28,59 +32,74 @@ bot = Bot(token=BOT_TOKEN)
 app = Flask(__name__)
 ist = ZoneInfo(TIMEZONE_IST)
 
-# ========================= KEYBOARD =========================
-def get_keyboard():
+# ========================= KEYBOARDS =========================
+def get_alert_keyboard():
+    """Keyboard for alert message"""
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("DEPOSIT $100 → GET $600 (500% BONUS)", url=REGISTER_LINK)],
-        [InlineKeyboardButton("USE CODE: BETWIN190", url=REGISTER_LINK)],
-        [InlineKeyboardButton("REGISTER & PLAY NOW", url=REGISTER_LINK)]
+        [InlineKeyboardButton("📲 Register Now", url=REGISTER_LINK)],
+        [InlineKeyboardButton("🎮 Enter Aviator", url=REGISTER_LINK)]
     ])
 
-# ========================= MESSAGES (Clean & Perfect) =========================
+def get_live_keyboard():
+    """Keyboard for live signal"""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("⚡ INSTANT DEPOSIT", url=REGISTER_LINK)],
+        [InlineKeyboardButton("🚀 PLAY NOW", url=REGISTER_LINK)]
+    ])
 
-# Alert: 5 mins after current signal
-ALERT_MSG = """**UPCOMING SIGNAL IN 5 MINUTES** 
+def get_success_keyboard():
+    """Keyboard for success message"""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("💰 DEPOSIT FOR NEXT", url=REGISTER_LINK)],
+        [InlineKeyboardButton("📊 CHECK STATS", url=REGISTER_LINK)]
+    ])
 
-**Time**: {signal_time} IST
-**Expected**: ~{preview}x
+# ========================= MESSAGES (Aviator Edition) =========================
 
-Get ready — High accuracy signal loading!
-Members are already entering
+# Alert: 5 mins before signal
+ALERT_MSG = """🚨 **UPCOMING SIGNAL IN 5 MINUTES**
 
-[DEPOSIT NOW → BETWIN190]({link})"""
+⏰ **Time**: {signal_time} IST
+🎯 **Expected**: ~{preview}x
+
+✅ High accuracy Aviator signal loading!
+🤑 Members are already positioning...
+
+**Code:** `{promocode}`"""
 
 # Live Signal: Exact time
-LIVE_MSG = """**LIVE SIGNAL — ENTER NOW** 
+LIVE_MSG = """🔥 **LIVE SIGNAL — ENTER NOW**
 
-**Game**: Lucky Jet
-**Time**: {signal_time} IST
-**Target**: **{target}x** (Cashout)
+🎮 **Game**: AVIATOR
+⏰ **Time**: {signal_time} IST
+🎯 **Target**: **{target}x** (Cashout)
 
-$100 → ${profit_100}
-$50 → ${profit_50}
+💸 **Potential Returns:**
+• $100 → ${profit_100}
+• $50 → ${profit_50}
 
-Enter in next 20 seconds!
+⏳ Enter in next 20 seconds!
 
-Last 10 signals: 9 Wins ✅
+📈 Last 10 signals: 9 Wins ✅
 
-[INSTANT DEPOSIT]({link})"""
+**Use Code:** `{promocode}`"""
 
 # Success: 5 mins after live signal
-SUCCESS_MSG = """**SIGNAL PASSED SUCCESSFULLY!** 
+SUCCESS_MSG = """✅ **SIGNAL HIT SUCCESSFULLY!**
 
-**{target}x HIT** at {signal_time} IST
+🎯 **{target}x HIT** at {signal_time} IST
 
-Members who followed → PAID!
+💰 Members who followed → PAID OUT!
 
-Example:
+📊 **Example Returns:**
 • $100 → ${profit_100} 
-• $50 → ${profit_50} 
+• $50 → ${profit_50}
 
-Drop **"PAID"** if you won 
+👇 Drop **"PAID"** if you won!
 
-Next signal in 10 minutes!
+🔄 Next signal in 10 minutes...
 
-[GET READY FOR NEXT → BETWIN190]({link})"""
+**Code for Bonus:** `{promocode}`"""
 
 # ========================= TIMING CALCULATION =========================
 def get_next_signal_time(now: datetime) -> tuple:
@@ -93,7 +112,6 @@ def get_next_signal_time(now: datetime) -> tuple:
     # Find next 15-minute interval
     next_15 = ((current_minute // 15) + 1) * 15
     if next_15 == 60:
-        # Next hour
         signal_dt = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
     else:
         signal_dt = now.replace(minute=next_15, second=0, microsecond=0)
@@ -101,7 +119,7 @@ def get_next_signal_time(now: datetime) -> tuple:
     # Alert is 5 minutes before next signal
     alert_dt = signal_dt - timedelta(minutes=5)
     
-    # Calculate the signal after next (for success message timing)
+    # Calculate the signal after next
     next_next_15 = next_15 + 15
     if next_next_15 >= 60:
         next_signal_dt = signal_dt.replace(minute=0) + timedelta(hours=1)
@@ -110,12 +128,27 @@ def get_next_signal_time(now: datetime) -> tuple:
     
     return signal_dt, alert_dt, next_signal_dt
 
+def is_active_hours(now: datetime) -> bool:
+    """Check if current time is within active hours (10 PM to 1 AM)"""
+    current_hour = now.hour
+    
+    # Handle overnight period (10 PM to 1 AM next day)
+    if current_hour >= ACTIVE_HOURS_START or current_hour < ACTIVE_HOURS_END:
+        return True
+    return False
+
 # ========================= MAIN SCHEDULER =========================
 async def signal_scheduler():
     while True:
         now = datetime.now(ist)
         current_time_str = now.strftime("%I:%M:%S %p").lstrip("0")
         
+        # Check if within active hours
+        if not is_active_hours(now):
+            logger.info(f"⏸️ Outside active hours ({current_time_str}). Sleeping 60s...")
+            await asyncio.sleep(60)
+            continue
+            
         # Calculate next signal times
         signal_dt, alert_dt, next_signal_dt = get_next_signal_time(now)
         signal_time_str = signal_dt.strftime("%I:%M %p").lstrip("0")
@@ -125,19 +158,22 @@ async def signal_scheduler():
         time_to_alert = (alert_dt - now).total_seconds()
         
         if 0 <= time_to_alert < 60:  # Within next minute
-            logger.info(f"ALERT TIME DETECTED → Current: {current_time_str}, Alert at: {alert_time_str}, Signal at: {signal_time_str}")
+            logger.info(f"🔔 ALERT DETECTED → Current: {current_time_str}, Alert: {alert_time_str}, Signal: {signal_time_str}")
             
             # Generate signal data
-            target = round(random.uniform(11.5, 35.0), 1)
-            preview = round(target + random.uniform(-4.0, 5.0), 1)
+            target = round(random.uniform(2.5, 8.0), 1)  # Aviator typically lower multipliers
+            preview = round(target + random.uniform(-0.5, 1.5), 1)
             
             # === 1. SEND ALERT ===
-            await broadcast(ALERT_MSG.format(
-                signal_time=signal_time_str,
-                preview=preview,
-                link=REGISTER_LINK
-            ))
-            logger.info(f"✅ Alert sent for {signal_time_str} signal (Target: {target}x)")
+            await broadcast(
+                message=ALERT_MSG.format(
+                    signal_time=signal_time_str,
+                    preview=preview,
+                    promocode=PROMOCODE
+                ),
+                keyboard=get_alert_keyboard()
+            )
+            logger.info(f"✅ Alert sent for {signal_time_str} (Target: {target}x)")
             
             # Wait until exact signal time
             wait_seconds = (signal_dt - now).total_seconds()
@@ -149,13 +185,16 @@ async def signal_scheduler():
             profit_100 = int(100 * (target - 1))
             profit_50 = int(50 * (target - 1))
             
-            await broadcast(LIVE_MSG.format(
-                signal_time=signal_time_str,
-                target=target,
-                profit_100=f"{profit_100:,}",
-                profit_50=f"{profit_50:,}",
-                link=REGISTER_LINK
-            ))
+            await broadcast(
+                message=LIVE_MSG.format(
+                    signal_time=signal_time_str,
+                    target=target,
+                    profit_100=f"{profit_100:,}",
+                    profit_50=f"{profit_50:,}",
+                    promocode=PROMOCODE
+                ),
+                keyboard=get_live_keyboard()
+            )
             logger.info(f"🎯 Live signal sent at {signal_time_str} | Target: {target}x")
             
             # Wait 5 minutes for success message
@@ -163,33 +202,36 @@ async def signal_scheduler():
             
             # === 3. SEND SUCCESS MESSAGE ===
             next_signal_time_str = next_signal_dt.strftime("%I:%M %p").lstrip("0")
-            await broadcast(SUCCESS_MSG.format(
-                target=target,
-                signal_time=signal_time_str,
-                profit_100=f"{profit_100:,}",
-                profit_50=f"{profit_50:,}",
-                link=REGISTER_LINK
-            ))
-            logger.info(f"✅ Success sent for {signal_time_str} | Next signal at {next_signal_time_str}")
+            await broadcast(
+                message=SUCCESS_MSG.format(
+                    target=target,
+                    signal_time=signal_time_str,
+                    profit_100=f"{profit_100:,}",
+                    profit_50=f"{profit_50:,}",
+                    promocode=PROMOCODE
+                ),
+                keyboard=get_success_keyboard()
+            )
+            logger.info(f"✅ Success sent for {signal_time_str} | Next: {next_signal_time_str}")
         
         # Sleep to check again
         await asyncio.sleep(10)
 
 # ========================= BROADCAST =========================
-async def broadcast(text: str):
+async def broadcast(message: str, keyboard: InlineKeyboardMarkup):
     for chat_id in GROUP_CHAT_IDS:
         try:
             await bot.send_message(
                 chat_id=chat_id,
-                text=text,
+                text=message,
                 parse_mode="Markdown",
                 disable_web_page_preview=True,
-                reply_markup=get_keyboard()
+                reply_markup=keyboard
             )
             await asyncio.sleep(0.8)
         except TelegramError as e:
-            logger.error(f"Send failed {chat_id}: {e}")
-    logger.info(f"📤 Sent to all {len(GROUP_CHAT_IDS)} groups")
+            logger.error(f"❌ Send failed {chat_id}: {e}")
+    logger.info(f"📤 Sent to {len(GROUP_CHAT_IDS)} group(s)")
 
 # ========================= HEALTH =========================
 @app.route('/health')
@@ -197,16 +239,25 @@ def health():
     now = datetime.now(ist)
     signal_dt, alert_dt, next_signal_dt = get_next_signal_time(now)
     
+    active_status = "ACTIVE" if is_active_hours(now) else "INACTIVE (10 PM-1 AM only)"
+    
     return jsonify({
-        "status": "LIVE - 15 MIN SIGNAL BOT",
+        "status": f"LIVE - AVIATOR SIGNAL BOT [{active_status}]",
         "current_time": now.strftime("%I:%M:%S %p").lstrip("0"),
+        "active_hours": f"{ACTIVE_HOURS_START}:00 - {ACTIVE_HOURS_END}:00 IST",
+        "is_active_now": is_active_hours(now),
         "next_alert": alert_dt.strftime("%I:%M %p").lstrip("0"),
         "next_signal": signal_dt.strftime("%I:%M %p").lstrip("0"),
-        "next_success": (signal_dt + timedelta(minutes=5)).strftime("%I:%M %p").lstrip("0"),
         "time_until_alert": int((alert_dt - now).total_seconds()),
         "promocode": PROMOCODE,
-        "schedule": "Every 15 mins: Alert at -5min, Live at 00/15/30/45, Success at +5min"
+        "game": "Aviator",
+        "schedule": "Every 15 mins: Alert(-5m) → Live → Success(+5m)",
+        "groups": len(GROUP_CHAT_IDS)
     })
+
+@app.route('/')
+def home():
+    return "<h3>🚀 Aviator Signal Bot is Running</h3><p>Check /health for status</p>"
 
 # ========================= START =========================
 def run_bot():
@@ -217,8 +268,11 @@ def run_bot():
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     logger.info("=" * 60)
-    logger.info("🚀 LUCKY JET 15-MIN SIGNAL BOT STARTED")
-    logger.info("📅 Schedule: Every 15 minutes")
-    logger.info("⏰ Flow: Alert 5 min before → Live at exact time → Success 5 min after")
+    logger.info("🚀 AVIATOR SIGNAL BOT STARTED")
+    logger.info(f"🎮 Game: Aviator")
+    logger.info(f"⏰ Active Hours: {ACTIVE_HOURS_START}:00 to {ACTIVE_HOURS_END}:00 IST")
+    logger.info(f"📅 Schedule: Every 15 minutes during active hours")
+    logger.info(f"📊 Flow: Alert 5m before → Live → Success 5m after")
+    logger.info(f"👥 Groups: {len(GROUP_CHAT_IDS)}")
     logger.info("=" * 60)
     app.run(host='0.0.0.0', port=PORT, use_reloader=False)
