@@ -12,7 +12,7 @@ import threading
 # ========================= CONFIG =========================
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 GROUP_CHAT_IDS = [int(x.strip()) for x in os.getenv('GROUP_CHAT_IDS', '').split(',') if x.strip()]
-REGISTER_LINK = "https://lkpq.cc/2ee301"
+REGISTER_LINK = "https://lkpq.cc/27b4d101"
 PROMOCODE = "BETWIN190"
 TIMEZONE_IST = "Asia/Kolkata"
 PORT = int(os.getenv('PORT', 5000))
