@@ -13,7 +13,7 @@ import threading
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 # Use a comma-separated list of IDs in your Environment Variables
 GROUP_CHAT_IDS = [int(x.strip()) for x in os.getenv('GROUP_CHAT_IDS', '').split(',') if x.strip()]
-REGISTER_LINK = "https://lkpq.cc/2551"
+REGISTER_LINK = "https://lkpq.cc/22fba15d"
 PROMOCODE = "BETWIN190"
 TIMEZONE_IST = "Asia/Kolkata"
 PORT = int(os.getenv('PORT', 5000))
