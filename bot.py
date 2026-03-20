@@ -11,14 +11,14 @@ import threading
 
 # ========================= CONFIG =========================
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-# Comma-separated IDs in Render Env Vars
+# In Render, add GROUP_CHAT_IDS as a comma-separated list of numbers
 GROUP_CHAT_IDS = [int(x.strip()) for x in os.getenv('GROUP_CHAT_IDS', '').split(',') if x.strip()]
 REGISTER_LINK = "https://lkpq.cc/22fba15d"
 PROMOCODE = "BETWIN190"
 TIMEZONE_IST = "Asia/Kolkata"
-PORT = int(os.getenv('PORT', 10000)) # Render uses 10000 by default
+PORT = int(os.getenv('PORT', 10000)) 
 
-# Ensure this exact file is in your GitHub repo root
+# The APK file must be in the same folder as this script on GitHub
 APK_FILE_NAME = "1win .apk" 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)s | %(message)s')
@@ -36,57 +36,58 @@ def get_main_keyboard():
         [InlineKeyboardButton("📱 DOWNLOAD APP", url=REGISTER_LINK)]
     ])
 
-# ========================= MESSAGES =========================
+# ========================= CONVERSION MESSAGES =========================
 
-APK_CAPTION = f"""📥 **INSTALL THE OFFICIAL 1WIN APP** 📥
+APK_CAPTION = f"""📥 **OFFICIAL AVIATOR APP DETECTED** 📥
 
-For the fastest signals and zero lag, use the Android App!
+Using the app reduces signal lag and increases winning speed!
 
-1️⃣ **Download** the APK attached below.
-2️⃣ **Register** using code: `{PROMOCODE}`
-3️⃣ **Deposit** to get **500% Bonus** (₹1000 becomes ₹5000).
+1️⃣ **Download** the APK file below.
+2️⃣ **Login/Register** with code: `{PROMOCODE}`
+3️⃣ **Deposit** at least ₹500 to activate the 500% bonus.
 
-⚠️ *Web version has 2s delay. Use the APP to win!*"""
+⚡ *App users get signals 2 seconds faster than web users!*"""
 
-ALERT_MSG = """⚠️ **PREPARING NEXT SIGNAL...** ⚠️
+ALERT_MSG = """⚠️ **SIGNAL SCANNING STARTED...** ⚠️
 
-⏰ **Time:** {signal_time} IST
-🎯 **Expectation:** Over {preview}x
+⏰ **Target Time:** {signal_time} IST
+🎯 **Expected Multiplier:** Over {preview}x
 
-✅ Status: **Analyzing Algorithm...**
-💎 Use Code: `{promocode}`
+✅ Status: **Algorithm Synchronized**
+💎 Use Promo Code: `{promocode}`
 
-*Make sure your balance is ready! Don't miss this flight.* 🛫"""
+*Check your balance now. If it's low, deposit quickly to avoid missing the flight!* 🛫"""
 
 LIVE_MSG = """🔔 **LIVE SIGNAL - BET NOW!** 🔔
 
 🎮 **Game:** AVIATOR
 ⏰ **Time:** {signal_time} IST
-🎯 **Auto-Cashout:** **{target}x**
+🎯 **AUTO-CASHOUT AT:** **{target}x**
 
-💰 **ESTIMATED PROFIT:**
-• ₹500  ➡️  **₹{profit_500}**
-• ₹1,000 ➡️  **₹{profit_1000}**
-• ₹5,000 ➡️  **₹{profit_5000}**
+💰 **ESTIMATED WINNINGS:**
+• Deposit ₹500  ➡️  **₹{profit_500}**
+• Deposit ₹1,000 ➡️  **₹{profit_1000}**
+• Deposit ₹5,000 ➡️  **₹{profit_5000}**
 
-⏳ **Action:** Place bet and cashout at {target}x exactly!"""
+⏳ **Action:** Open App, place bet, and cashout at {target}x!"""
 
-SUCCESS_MSG = """✅ **PROFIT BOOKED! {target}x HIT!!** ✅
+SUCCESS_MSG = """✅ **PROFIT CONFIRMED! {target}x SMASHED!!** ✅
 
-The algorithm predicted {target}x and we smashed it at {signal_time} IST! 🚀
+Signal Time: {signal_time} IST
+Our prediction hit perfectly! 🚀
 
-📊 **RESULTS:**
-• ₹500  ➡️  **₹{profit_500} WIN**
-• ₹1,000 ➡️  **₹{profit_1000} WIN**
+📊 **EARNINGS LIST:**
+• User A: ₹500  ➡️  **₹{profit_500} WIN**
+• User B: ₹1,000 ➡️  **₹{profit_1000} WIN**
 
-Congratulations to everyone who followed! 💸💸"""
+Congratulations! Send your winning screenshots to the admin! 💸💸"""
 
-# ========================= BROADCAST LOGIC =========================
+# ========================= CORE FUNCTIONS =========================
 
 async def send_apk_to_all():
-    """Broadcasts the APK file to all configured groups"""
+    """Sends the actual APK file to the groups"""
     if not os.path.exists(APK_FILE_NAME):
-        logger.error(f"CRITICAL: {APK_FILE_NAME} not found in root directory!")
+        logger.error(f"FILE MISSING: {APK_FILE_NAME} not found in root directory!")
         return
 
     for chat_id in GROUP_CHAT_IDS:
@@ -94,14 +95,14 @@ async def send_apk_to_all():
             with open(APK_FILE_NAME, 'rb') as doc:
                 await bot.send_document(
                     chat_id=chat_id,
-                    document=InputFile(doc, filename="1Win_Official_App.apk"),
+                    document=InputFile(doc, filename="1Win_Aviator_Official.apk"),
                     caption=APK_CAPTION,
                     parse_mode="Markdown",
                     reply_markup=get_main_keyboard()
                 )
-            logger.info(f"APK successfully sent to {chat_id}")
+            logger.info(f"APK delivered to {chat_id}")
         except Exception as e:
-            logger.error(f"Failed to send APK to {chat_id}: {e}")
+            logger.error(f"APK delivery failed for {chat_id}: {e}")
 
 async def broadcast(message, keyboard):
     for chat_id in GROUP_CHAT_IDS:
@@ -114,53 +115,51 @@ async def broadcast(message, keyboard):
                 disable_web_page_preview=True
             )
         except Exception as e:
-            logger.error(f"Broadcast error for {chat_id}: {e}")
+            logger.error(f"Broadcast error: {e}")
 
 # ========================= SCHEDULER =========================
 
 async def signal_scheduler():
-    # Initial APK send when server starts
+    # Send APK immediately when the server starts
     await send_apk_to_all()
     
     while True:
         now = datetime.now(ist)
-        hour = now.hour
-        
-        # Active hours: 10 PM to 1 AM IST
-        is_active = hour >= 22 or hour < 1
+        # Active: 10:00 PM to 01:00 AM IST
+        is_active = now.hour >= 22 or now.hour < 1
         
         if not is_active:
             await asyncio.sleep(60)
             continue
 
-        # Logic to find the next 15-minute interval
-        current_minute = now.minute
-        next_15 = ((current_minute // 15) + 1) * 15
+        # Get next 15-min mark
+        next_15 = ((now.minute // 15) + 1) * 15
         if next_15 == 60:
             signal_dt = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
         else:
             signal_dt = now.replace(minute=next_15, second=0, microsecond=0)
             
         alert_dt = signal_dt - timedelta(minutes=5)
-        time_until_alert = (alert_dt - now).total_seconds()
         
-        if 0 <= time_until_alert < 30:
-            target = round(random.uniform(2.1, 4.8), 2)
+        # If we are in the "Alert Window" (5 mins before signal)
+        time_diff = (alert_dt - now).total_seconds()
+        if 0 <= time_diff < 30:
+            target = round(random.uniform(2.2, 4.9), 2)
             preview = round(target - 0.3, 1)
             
-            # Phase 1: ALERT
+            # 1. ALERT
             await broadcast(ALERT_MSG.format(
                 signal_time=signal_dt.strftime("%I:%M %p"),
                 preview=preview,
                 promocode=PROMOCODE
             ), get_main_keyboard())
             
-            # Wait until the actual signal time
-            wait_for_live = (signal_dt - datetime.now(ist)).total_seconds()
-            if wait_for_live > 0:
-                await asyncio.sleep(wait_for_live)
+            # Wait for signal time
+            wait_live = (signal_dt - datetime.now(ist)).total_seconds()
+            if wait_live > 0:
+                await asyncio.sleep(wait_live)
             
-            # Phase 2: LIVE
+            # 2. LIVE
             p500, p1000, p5000 = int(500 * target), int(1000 * target), int(5000 * target)
             await broadcast(LIVE_MSG.format(
                 signal_time=signal_dt.strftime("%I:%M %p"),
@@ -170,7 +169,7 @@ async def signal_scheduler():
                 profit_5000=f"{p5000:,}"
             ), get_main_keyboard())
 
-            # Phase 3: SUCCESS (Post results 2 mins later)
+            # 3. SUCCESS (2 minutes after signal)
             await asyncio.sleep(120)
             await broadcast(SUCCESS_MSG.format(
                 target=target,
@@ -179,21 +178,21 @@ async def signal_scheduler():
                 profit_1000=f"{p1000:,}"
             ), get_main_keyboard())
 
-        await asyncio.sleep(30)
+        await asyncio.sleep(25)
 
-# ========================= RUNNER =========================
+# ========================= DEPLOYMENT =========================
 
 @app.route('/')
-def health_check():
-    return "Bot is running on Render", 200
+def health():
+    return "Aviator Bot Live", 200
 
-def start_async_loop():
+def run_async():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(signal_scheduler())
 
 if __name__ == "__main__":
-    # Run the Telegram logic in a background thread
-    threading.Thread(target=start_async_loop, daemon=True).start()
-    # Run Flask on the port provided by Render
+    # Start the background scheduler
+    threading.Thread(target=run_async, daemon=True).start()
+    # Start the Flask server for Render
     app.run(host='0.0.0.0', port=PORT)
